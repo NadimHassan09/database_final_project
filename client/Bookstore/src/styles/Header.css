@@ -1,0 +1,224 @@
+/* ============================================
+   Modern Header - Top Bar Styling
+   ============================================ */
+
+:root {
+  --header-height: 80px;
+  --header-height-mobile: 70px;
+}
+
+.modern-header {
+  background-color: #FFFFFF;
+  border-bottom: 1px solid #F0F0F0;
+  padding: 1.25rem 0;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s ease;
+  min-height: var(--header-height);
+  display: flex;
+  align-items: center;
+}
+
+.modern-header .container {
+  max-width: 1320px;
+}
+
+/* Logo Section */
+.header-logo {
+  display: flex;
+  align-items: center;
+}
+
+.logo-link {
+  text-decoration: none;
+  transition: all 0.3s ease;
+}
+
+.logo-text {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #222222;
+  text-transform: uppercase;
+  transition: all 0.3s ease;
+}
+
+.logo-link:hover .logo-text {
+  color: #E6003D;
+  transform: scale(1.05);
+}
+
+/* Search Section */
+.header-search {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1rem;
+}
+
+.search-wrapper {
+  width: 100%;
+  max-width: 500px;
+}
+
+/* Actions Section */
+.header-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.header-icons {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.header-icon {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+  color: #666666;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  position: relative;
+  padding: 0.5rem;
+  border-radius: 8px;
+}
+
+.header-icon svg {
+  transition: all 0.3s ease;
+}
+
+.header-icon:hover {
+  color: #E6003D;
+  background-color: #FAFAFA;
+}
+
+.header-icon:hover svg {
+  transform: scale(1.1);
+}
+
+.icon-label {
+  display: none;
+}
+
+/* Cart Icon with Badge */
+.cart-icon {
+  position: relative;
+}
+
+.cart-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  background-color: #E6003D;
+  color: #FFFFFF;
+  font-size: 0.625rem;
+  font-weight: 700;
+  padding: 0.125rem 0.375rem;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+  line-height: 1.2;
+  box-shadow: 0 2px 4px rgba(230, 0, 61, 0.3);
+}
+
+/* Header Buttons (Login/Register) */
+.header-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.625rem 1.25rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-decoration: none;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+
+.header-button-login {
+  color: #222222;
+  background-color: transparent;
+  border: 2px solid #E5E5E5;
+}
+
+.header-button-login:hover {
+  color: #E6003D;
+  border-color: #E6003D;
+  background-color: #FAFAFA;
+  transform: translateY(-1px);
+}
+
+.header-button-register {
+  color: #FFFFFF;
+  background-color: #E6003D;
+  border: 2px solid #E6003D;
+}
+
+.header-button-register:hover {
+  background-color: #C50033;
+  border-color: #C50033;
+  color: #FFFFFF;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(230, 0, 61, 0.3);
+}
+
+/* Responsive Design */
+@media (min-width: 768px) {
+  .icon-label {
+    display: inline;
+  }
+  
+  .header-icon {
+    padding: 0.5rem 0.75rem;
+  }
+}
+
+@media (max-width: 767px) {
+  :root {
+    --header-height-mobile: 140px; /* Taller on mobile due to stacked layout */
+  }
+  
+  .modern-header {
+    padding: 1rem 0;
+    min-height: var(--header-height-mobile);
+  }
+  
+  .header-logo {
+    margin-bottom: 1rem;
+    justify-content: center;
+  }
+  
+  .header-search {
+    margin-bottom: 1rem;
+    padding: 0;
+  }
+  
+  .header-actions {
+    justify-content: center;
+  }
+  
+  .header-icons {
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .logo-text {
+    font-size: 1.5rem;
+  }
+  
+  .header-button {
+    padding: 0.5rem 1rem;
+    font-size: 0.8125rem;
+  }
+}
+

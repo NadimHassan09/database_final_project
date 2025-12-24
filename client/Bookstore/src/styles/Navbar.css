@@ -1,0 +1,378 @@
+/* ============================================
+   Modern Navbar - Main Navigation Styling
+   ============================================ */
+
+.modern-navbar {
+  background: linear-gradient(to bottom, #FFFFFF 0%, #FAFAFA 100%);
+  border: none !important;
+  border-bottom: 1px solid rgba(229, 229, 229, 0.3);
+  padding: 0.75rem 0;
+  position: sticky;
+  top: var(--header-height); /* Position below the header using CSS variable */
+  z-index: 998;
+  box-shadow: none !important;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+  margin: 0 !important;
+  outline: none !important;
+}
+
+/* Ensure all child elements have transparent background and no borders */
+.modern-navbar .navbar,
+.modern-navbar .navbar-collapse,
+.modern-navbar .navbar-nav,
+.modern-navbar .container,
+.modern-navbar .modern-navbar-inner,
+.modern-navbar .nav,
+.modern-navbar .nav-link {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Remove Bootstrap default navbar styles */
+.modern-navbar .navbar {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.modern-navbar .navbar-collapse {
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* When header is collapsed on mobile, adjust navbar position */
+@media (max-width: 767px) {
+  .modern-navbar {
+    top: var(--header-height-mobile); /* Use mobile header height */
+    padding: 0.5rem 0;
+  }
+}
+
+.modern-navbar-inner {
+  padding: 0.5rem 0;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  background: transparent !important;
+  border: none !important;
+  margin: 0 !important;
+}
+
+.modern-navbar .container {
+  max-width: 1320px;
+  padding-left: 2rem;
+  padding-right: 2rem;
+  background: transparent !important;
+  border: none !important;
+  margin: 0 !important;
+}
+
+@media (max-width: 991px) {
+  .modern-navbar .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+/* Navbar Toggle Button */
+.navbar-toggle {
+  border: 1px solid #E5E5E5;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  transition: all 0.3s ease;
+}
+
+.navbar-toggle:hover {
+  border-color: #E6003D;
+  background-color: #FAFAFA;
+}
+
+.navbar-toggle:focus {
+  box-shadow: 0 0 0 0.2rem rgba(230, 0, 61, 0.1);
+}
+
+/* Navigation Menu */
+.modern-nav-menu {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-grow: 1;
+  padding: 0.25rem 0;
+  background: transparent !important;
+  border: none !important;
+  margin: 0 !important;
+}
+
+.modern-nav-link {
+  color: #222222 !important;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-size: 0.8125rem;
+  padding: 0.875rem 1.5rem !important;
+  text-decoration: none;
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 8px;
+  margin: 0 0.125rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.modern-nav-link::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(230, 0, 61, 0.08) 0%, rgba(230, 0, 61, 0.04) 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.modern-nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: 0.5rem;
+  left: 50%;
+  transform: translateX(-50%) scaleX(0);
+  width: 50%;
+  height: 3px;
+  background: linear-gradient(90deg, #E6003D 0%, #FF1A5C 100%);
+  border-radius: 2px;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.modern-nav-link:hover {
+  color: #E6003D !important;
+  background-color: rgba(230, 0, 61, 0.05);
+  transform: translateY(-1px);
+}
+
+.modern-nav-link:hover::before {
+  opacity: 1;
+}
+
+.modern-nav-link:hover::after {
+  transform: translateX(-50%) scaleX(1);
+}
+
+.modern-nav-link.active {
+  color: #E6003D !important;
+  background: linear-gradient(135deg, rgba(230, 0, 61, 0.1) 0%, rgba(230, 0, 61, 0.05) 100%);
+  font-weight: 700;
+}
+
+.modern-nav-link.active::before {
+  opacity: 1;
+}
+
+.modern-nav-link.active::after {
+  transform: translateX(-50%) scaleX(1);
+  width: 70%;
+}
+
+.modern-nav-link-primary {
+  background-color: #E6003D !important;
+  color: #FFFFFF !important;
+  border-radius: 6px;
+  padding: 1rem 1.5rem !important;
+  margin-left: 0.5rem;
+}
+
+.modern-nav-link-primary:hover {
+  background-color: #C50033 !important;
+  color: #FFFFFF !important;
+}
+
+.modern-nav-link-primary::after {
+  display: none;
+}
+
+/* Account Section */
+.modern-nav-account {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-left: auto;
+  padding-left: 1rem;
+  border-left: 1px solid rgba(229, 229, 229, 0.5);
+  background: transparent !important;
+}
+
+/* Dropdown Menu */
+.modern-dropdown .dropdown-toggle {
+  color: #222222 !important;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-size: 0.8125rem;
+  padding: 0.875rem 1.5rem !important;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 8px;
+  position: relative;
+}
+
+.modern-dropdown .dropdown-toggle::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(230, 0, 61, 0.08) 0%, rgba(230, 0, 61, 0.04) 100%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.modern-dropdown .dropdown-toggle:hover {
+  color: #E6003D !important;
+  background-color: rgba(230, 0, 61, 0.05);
+  transform: translateY(-1px);
+}
+
+.modern-dropdown .dropdown-toggle:hover::before {
+  opacity: 1;
+}
+
+.modern-dropdown .dropdown-toggle::after {
+  margin-left: 0.5rem;
+  border-color: currentColor;
+}
+
+.account-dropdown-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.account-dropdown-trigger svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Dropdown Menu Items */
+.modern-dropdown .dropdown-menu {
+  border: none;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  padding: 0.5rem 0;
+  margin-top: 0.5rem;
+  min-width: 200px;
+  background-color: #FFFFFF !important;
+}
+
+.modern-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  color: #222222;
+  font-size: 0.875rem;
+  transition: all 0.3s ease;
+  text-decoration: none;
+}
+
+.modern-dropdown-item svg {
+  width: 16px;
+  height: 16px;
+  color: #666666;
+  transition: all 0.3s ease;
+}
+
+.modern-dropdown-item:hover {
+  background-color: #FAFAFA;
+  color: #E6003D;
+}
+
+.modern-dropdown-item:hover svg {
+  color: #E6003D;
+}
+
+.modern-dropdown-item:active {
+  background-color: #E6003D;
+  color: #FFFFFF;
+}
+
+.modern-dropdown-item:active svg {
+  color: #FFFFFF;
+}
+
+.modern-dropdown-divider {
+  margin: 0.5rem 0;
+  border-color: #F0F0F0;
+  opacity: 1;
+}
+
+/* Responsive Design */
+@media (max-width: 991px) {
+  /* Keep navbar below header on all screen sizes */
+  .modern-navbar-inner {
+    padding: 0.75rem 0;
+  }
+  
+  .modern-nav-menu {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+    padding: 0.5rem 0;
+    width: 100%;
+  }
+  
+  .modern-nav-link {
+    width: 100%;
+    padding: 1rem 1.5rem !important;
+    margin: 0;
+    border-radius: 8px;
+    justify-content: flex-start;
+  }
+  
+  .modern-nav-link::after {
+    left: 1.5rem;
+    transform: scaleX(0);
+    width: 3px;
+    height: 60%;
+    top: 50%;
+    bottom: auto;
+    transform: translateY(-50%) scaleY(0);
+    border-radius: 2px;
+  }
+  
+  .modern-nav-link:hover::after,
+  .modern-nav-link.active::after {
+    transform: translateY(-50%) scaleY(1);
+  }
+  
+  .modern-nav-account {
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+    margin-left: 0;
+    padding: 1rem 0 0.5rem;
+    border-top: 1px solid rgba(229, 229, 229, 0.5);
+    border-left: none;
+    padding-left: 0;
+    background: transparent !important;
+  }
+  
+  .modern-nav-link-primary {
+    width: 100%;
+    margin-left: 0;
+    text-align: center;
+  }
+  
+  .modern-dropdown {
+    width: 100%;
+  }
+  
+  .modern-dropdown .dropdown-toggle {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+

@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import { NotificationProvider } from './context/NotificationContext';
+import Header from './components/Common/Header';
 import Nav from './components/Common/Nav';
 import Footer from './components/Common/Footer';
 import Home from './pages/Home';
@@ -41,6 +42,7 @@ function App() {
         <CartProvider>
           <NotificationProvider>
             <div className="d-flex flex-column min-vh-100">
+              <Header />
       <Nav />
               <main className="flex-grow-1">
                 <Routes>
