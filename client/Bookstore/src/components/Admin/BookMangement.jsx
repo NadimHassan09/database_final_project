@@ -3,7 +3,7 @@ import { Container, Row, Col, Table, Button, Badge, Alert } from 'react-bootstra
 import { useNavigate } from 'react-router-dom';
 import { getBooks, deleteBook } from '../../services/bookService';
 import { formatPrice, formatISBN } from '../../utils/formatters';
-import { getStockStatus } from '../../utils/helpers';
+import { getStockStatus, formatAuthors } from '../../utils/helpers';
 import LoadingSpinner from '../LoadingSpinner';
 import CustomModal from '../Common/CustomModal';
 
@@ -102,7 +102,7 @@ const BookManagement = () => {
                   <td>{formatISBN(book.isbn)}</td>
                   <td>{book.title}</td>
                   <td>
-                    {book.authors?.map(a => a.name || a).join(', ') || 'N/A'}
+                    {formatAuthors(book.authors || book.authors_string, 'N/A')}
                   </td>
                   <td>{formatPrice(book.price)}</td>
                   <td>{book.quantity_in_stock || 0}</td>

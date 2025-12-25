@@ -70,11 +70,11 @@ function App() {
                   />
                   <Route
                     path="/customer/search"
-                    element={
-                      <ProtectedRoute>
-                        <BookSearch />
-                      </ProtectedRoute>
-                    }
+                    element={<BookSearch />}
+                  />
+                  <Route
+                    path="/search"
+                    element={<BookSearch />}
                   />
                   <Route
                     path="/customer/books/:isbn"

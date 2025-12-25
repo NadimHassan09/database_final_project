@@ -3,7 +3,7 @@ import { Container, Row, Col, Card, Button, Badge, Alert } from 'react-bootstrap
 import { useNavigate } from 'react-router-dom';
 import { getBooks } from '../../services/bookService';
 import { formatPrice } from '../../utils/formatters';
-import { getStockStatus } from '../../utils/helpers';
+import { getStockStatus, formatAuthors } from '../../utils/helpers';
 import { useCart } from '../../context/CartContext';
 import { useNotification } from '../../context/NotificationContext';
 import LoadingSpinner from '../LoadingSpinner';
@@ -33,11 +33,35 @@ const BookBrowser = () => {
         page: currentPage,
         limit: itemsPerPage,
       });
-      setBooks(response.books || response.data || []);
-      setTotalPages(response.totalPages || Math.ceil((response.total || 0) / itemsPerPage) || 1);
+      
+      // Backend returns: { success: true, data: { books: [...], total, page, totalPages } }
+      // bookService.getBooks() returns response.data, so:
+      // response = { success: true, data: { books: [...], total, page, totalPages } }
+      // response.data = { books: [...], total, page, totalPages }
+      // response.data.books = [...]
+      
+      let booksArray = [];
+      let totalPagesValue = 1;
+      
+      if (response && response.data) {
+        // Standard backend response structure
+        booksArray = Array.isArray(response.data.books) ? response.data.books : [];
+        totalPagesValue = response.data.totalPages || Math.ceil((response.data.total || 0) / itemsPerPage) || 1;
+      } else if (response && Array.isArray(response.books)) {
+        // Fallback: direct books array
+        booksArray = response.books;
+        totalPagesValue = response.totalPages || Math.ceil((response.total || 0) / itemsPerPage) || 1;
+      } else if (Array.isArray(response)) {
+        // Fallback: response is directly an array
+        booksArray = response;
+      }
+      
+      setBooks(booksArray);
+      setTotalPages(totalPagesValue);
     } catch (err) {
       setError('Failed to load books. Please try again.');
       console.error('Error loading books:', err);
+      setBooks([]); // Ensure books is always an array
     } finally {
       setLoading(false);
     }
@@ -85,12 +109,12 @@ const BookBrowser = () => {
                       variant="top"
                       src={book.image || book.cover_image || 'https://via.placeholder.com/200x300?text=Book'}
                       style={{ height: '300px', objectFit: 'cover', cursor: 'pointer' }}
-                      onClick={() => navigate(`/customer/books/${book.isbn}`)}
+                      onClick={() => navigate(`/customer/books/${encodeURIComponent(book.isbn)}`)}
                     />
                     <Card.Body className="d-flex flex-column">
                       <Card.Title className="h6">{book.title}</Card.Title>
                       <Card.Text className="text-muted small">
-                        {book.authors?.map(a => a.name || a).join(', ') || 'Unknown Author'}
+                        {formatAuthors(book.authors || book.authors_string)}
                       </Card.Text>
                       <div className="mt-auto">
                         <div className="d-flex justify-content-between align-items-center mb-2">
@@ -101,7 +125,7 @@ const BookBrowser = () => {
                           <Button
                             variant="primary"
                             size="sm"
-                            onClick={() => navigate(`/customer/books/${book.isbn}`)}
+                            onClick={() => navigate(`/customer/books/${encodeURIComponent(book.isbn)}`)}
                           >
                             View Details
                           </Button>

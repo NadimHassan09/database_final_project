@@ -14,7 +14,10 @@ const Header = () => {
   const cartCount = getCartItemCount();
 
   const handleSearch = (query) => {
-    navigate(`/customer/search?q=${encodeURIComponent(query)}`);
+    if (query && query.trim()) {
+      // Navigate to search page with query parameter
+      navigate(`/customer/search?q=${encodeURIComponent(query.trim())}`);
+    }
   };
 
   return (

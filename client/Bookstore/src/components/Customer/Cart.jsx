@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCart } from '../../context/CartContext';
 import { formatPrice } from '../../utils/formatters';
 import { validateQuantity } from '../../utils/validators';
+import { formatAuthors } from '../../utils/helpers';
 import { useNotification } from '../../context/NotificationContext';
 import LoadingSpinner from '../LoadingSpinner';
 
@@ -113,7 +114,7 @@ const Cart = () => {
                               <strong>{item.title}</strong>
                               <br />
                               <small className="text-muted">
-                                {item.authors?.map(a => a.name || a).join(', ') || 'Unknown Author'}
+                                {formatAuthors(item.authors || item.authors_string)}
                               </small>
                             </div>
                           </div>

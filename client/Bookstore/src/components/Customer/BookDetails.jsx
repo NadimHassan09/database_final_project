@@ -3,7 +3,7 @@ import { Container, Row, Col, Card, Button, Badge, Alert, Form } from 'react-boo
 import { useParams, useNavigate } from 'react-router-dom';
 import { getBookByISBN } from '../../services/bookService';
 import { formatPrice, formatISBN } from '../../utils/formatters';
-import { getStockStatus } from '../../utils/helpers';
+import { getStockStatus, formatAuthors } from '../../utils/helpers';
 import { validateQuantity } from '../../utils/validators';
 import { useCart } from '../../context/CartContext';
 import { useNotification } from '../../context/NotificationContext';
@@ -29,11 +29,46 @@ const BookDetails = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await getBookByISBN(isbn);
-      setBook(response.book || response.data || response);
+      
+      // Decode ISBN in case it's URL encoded
+      const decodedISBN = decodeURIComponent(isbn);
+      
+      const response = await getBookByISBN(decodedISBN);
+      
+      // Backend returns: { success: true, data: { book: {...} } }
+      // bookService.getBookByISBN() returns response.data, so:
+      // response = { success: true, data: { book: {...} } }
+      // response.data = { book: {...} }
+      // response.data.book = {...}
+      
+      let bookData = null;
+      
+      if (response && response.data && response.data.book) {
+        bookData = response.data.book;
+      } else if (response && response.book) {
+        bookData = response.book;
+      } else if (response && response.success !== false && !response.data) {
+        // Response might be the book itself
+        bookData = response;
+      }
+      
+      if (!bookData || (typeof bookData === 'object' && bookData.success === false)) {
+        throw new Error(response?.data?.message || response?.message || 'Book not found');
+      }
+      
+      // Ensure book has required properties
+      if (!bookData.isbn || !bookData.title) {
+        console.warn('Book data missing required fields:', bookData);
+        throw new Error('Invalid book data received');
+      }
+      
+      setBook(bookData);
     } catch (err) {
-      setError('Failed to load book details. Please try again.');
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to load book details. Please try again.';
+      setError(errorMessage);
       console.error('Error loading book:', err);
+      console.error('ISBN used:', isbn);
+      setBook(null);
     } finally {
       setLoading(false);
     }
@@ -76,11 +111,24 @@ const BookDetails = () => {
     return <LoadingSpinner />;
   }
 
+  if (error && !book) {
+    return (
+      <Container className="my-4">
+        <Alert variant="danger">{error}</Alert>
+        <Button onClick={() => navigate('/customer/books')} className="mt-3">
+          Back to Books
+        </Button>
+      </Container>
+    );
+  }
+
   if (!book) {
     return (
       <Container className="my-4">
         <Alert variant="warning">Book not found.</Alert>
-        <Button onClick={() => navigate('/customer/books')}>Back to Books</Button>
+        <Button onClick={() => navigate('/customer/books')} className="mt-3">
+          Back to Books
+        </Button>
       </Container>
     );
   }
@@ -115,7 +163,7 @@ const BookDetails = () => {
             <Card.Body>
               <h2>{book.title}</h2>
               <p className="text-muted">
-                by {book.authors?.map(a => a.name || a).join(', ') || 'Unknown Author'}
+                by {formatAuthors(book.authors || book.authors_string)}
               </p>
 
               <div className="mb-3">
@@ -130,7 +178,10 @@ const BookDetails = () => {
               <div className="mb-3">
                 <p><strong>Publication Year:</strong> {book.publication_year || 'N/A'}</p>
                 <p><strong>Publisher:</strong> {book.publisher?.name || book.publisher_name || 'N/A'}</p>
-                <p><strong>Stock Available:</strong> {book.quantity_in_stock || 0} units</p>
+                <p><strong>Stock Available:</strong> {book.quantity_in_stock !== undefined ? book.quantity_in_stock : 0} units</p>
+                {book.min_threshold !== undefined && (
+                  <p><strong>Minimum Threshold:</strong> {book.min_threshold} units</p>
+                )}
               </div>
 
               {stockStatus.available && (

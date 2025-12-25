@@ -111,3 +111,23 @@ export const getInitials = (firstName, lastName) => {
   return `${first}${last}`;
 };
 
+/**
+ * Format authors for display
+ * Handles both array format [{author_id, name}] and string format
+ * @param {Array|string} authors - Authors data
+ * @param {string} fallback - Fallback text if no authors
+ * @returns {string} Formatted author string
+ */
+export const formatAuthors = (authors, fallback = 'Unknown Author') => {
+  if (!authors) return fallback;
+  
+  if (Array.isArray(authors)) {
+    if (authors.length === 0) return fallback;
+    return authors.map(a => a.name || a).join(', ') || fallback;
+  } else if (typeof authors === 'string') {
+    return authors || fallback;
+  }
+  
+  return fallback;
+};
+

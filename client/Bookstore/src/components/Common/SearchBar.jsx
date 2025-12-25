@@ -1,15 +1,27 @@
 // Modern SearchBar Component
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Form, FormControl, Button, InputGroup } from "react-bootstrap";
+import { useSearchParams } from "react-router-dom";
 import '../../styles/SearchBar.css';
 
 const SearchBar = ({ onSearch }) => {
-  const [query, setQuery] = useState("");
+  const [searchParams] = useSearchParams();
+  const initialQuery = searchParams.get('q') || '';
+  const [query, setQuery] = useState(initialQuery);
+
+  // Update query when URL changes
+  useEffect(() => {
+    const urlQuery = searchParams.get('q') || '';
+    if (urlQuery !== query) {
+      setQuery(urlQuery);
+    }
+  }, [searchParams]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (onSearch && query.trim()) {
-      onSearch(query);
+    const trimmedQuery = query.trim();
+    if (onSearch && trimmedQuery) {
+      onSearch(trimmedQuery);
     }
   };
 

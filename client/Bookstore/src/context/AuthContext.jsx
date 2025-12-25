@@ -38,10 +38,16 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       const response = await loginService(username, password);
       
-      if (response.token && response.user) {
-        localStorage.setItem('token', response.token);
-        localStorage.setItem('user', JSON.stringify(response.user));
-        setUser(response.user);
+      // Backend returns: { success: true, message: "...", data: { user: {...}, token: "..." } }
+      // After axios, response.data is: { success: true, message: "...", data: { user: {...}, token: "..." } }
+      const responseData = response.data || response;
+      const token = responseData.data?.token || responseData.token;
+      const user = responseData.data?.user || responseData.user;
+      
+      if (token && user) {
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        setUser(user);
         return { success: true };
       }
       throw new Error('Invalid response from server');
@@ -60,10 +66,16 @@ export const AuthProvider = ({ children }) => {
       setLoading(true);
       const response = await registerService(userData);
       
-      if (response.token && response.user) {
-        localStorage.setItem('token', response.token);
-        localStorage.setItem('user', JSON.stringify(response.user));
-        setUser(response.user);
+      // Backend returns: { success: true, message: "...", data: { user: {...}, token: "..." } }
+      // After axios, response.data is: { success: true, message: "...", data: { user: {...}, token: "..." } }
+      const responseData = response.data || response;
+      const token = responseData.data?.token || responseData.token;
+      const user = responseData.data?.user || responseData.user;
+      
+      if (token && user) {
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        setUser(user);
         return { success: true };
       }
       throw new Error('Invalid response from server');
