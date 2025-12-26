@@ -5,49 +5,80 @@ import { getReplenishmentOrders, confirmReplenishmentOrder } from '../../service
 import { formatDate } from '../../utils/formatters';
 import { useNotification } from '../../context/NotificationContext';
 import LoadingSpinner from '../LoadingSpinner';
+import Pagination from '../Common/Pagination';
 
 const OrderManagement = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [confirmingOrderId, setConfirmingOrderId] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalOrders, setTotalOrders] = useState(0);
+  const itemsPerPage = 20; // Show 20 orders per page
   const navigate = useNavigate();
   const { showSuccess, showError } = useNotification();
 
   useEffect(() => {
     loadOrders();
-  }, []);
+    
+    // Listen for new order events (when auto-orders are created by triggers)
+    const handleNewOrder = () => {
+      loadOrders();
+    };
+    
+    window.addEventListener('newReplenishmentOrder', handleNewOrder);
+    
+    return () => {
+      window.removeEventListener('newReplenishmentOrder', handleNewOrder);
+    };
+  }, [currentPage]);
 
   const loadOrders = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await getReplenishmentOrders();
+      const response = await getReplenishmentOrders({
+        page: currentPage,
+        limit: itemsPerPage,
+      });
       
-      // Backend returns: { success: true, data: { orders: [...] } }
+      // Backend returns: { success: true, data: { orders: [...], total, page, totalPages } }
       // orderService.getReplenishmentOrders() returns response.data, so:
-      // response = { success: true, data: { orders: [...] } }
-      // response.data = { orders: [...] }
+      // response = { success: true, data: { orders: [...], total, page, totalPages } }
+      // response.data = { orders: [...], total, page, totalPages }
       // response.data.orders = [...]
       
       let ordersArray = [];
+      let totalPagesValue = 1;
+      let totalOrdersValue = 0;
       
       if (response && response.data) {
         // Standard backend response structure
         ordersArray = Array.isArray(response.data.orders) ? response.data.orders : [];
+        totalPagesValue = response.data.totalPages || Math.ceil((response.data.total || 0) / itemsPerPage) || 1;
+        totalOrdersValue = response.data.total || 0;
       } else if (Array.isArray(response.orders)) {
         // Fallback: direct orders array
         ordersArray = response.orders;
+        totalPagesValue = response.totalPages || Math.ceil((response.total || 0) / itemsPerPage) || 1;
+        totalOrdersValue = response.total || 0;
       } else if (Array.isArray(response)) {
         // Fallback: response is directly an array
         ordersArray = response;
+        totalPagesValue = 1;
+        totalOrdersValue = response.length;
       }
       
       setOrders(ordersArray);
+      setTotalPages(totalPagesValue);
+      setTotalOrders(totalOrdersValue);
     } catch (err) {
       setError('Failed to load orders. Please try again.');
       console.error('Error loading orders:', err);
       setOrders([]); // Ensure orders is always an array
+      setTotalPages(1);
+      setTotalOrders(0);
     } finally {
       setLoading(false);
     }
@@ -75,6 +106,14 @@ const OrderManagement = () => {
             quantity: response.data?.order?.quantity_ordered 
           } 
         }));
+        
+        // Check for new auto-orders that may have been created by the trigger
+        // (when stock was updated, if it's still below threshold, a new order may have been created)
+        // Wait a bit for the trigger to complete, then reload orders
+        setTimeout(() => {
+          loadOrders();
+          window.dispatchEvent(new CustomEvent('newReplenishmentOrder'));
+        }, 500);
       } else {
         showError(response.message || 'Failed to confirm order');
       }
@@ -85,6 +124,11 @@ const OrderManagement = () => {
     } finally {
       setConfirmingOrderId(null);
     }
+  };
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const getStatusBadge = (status) => {
@@ -106,6 +150,11 @@ const OrderManagement = () => {
       <Row className="mb-3">
         <Col>
           <h2>Replenishment Orders</h2>
+          {totalOrders > 0 && (
+            <p className="text-muted mb-0">
+              Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, totalOrders)} of {totalOrders} orders
+            </p>
+          )}
         </Col>
       </Row>
 
@@ -166,6 +215,19 @@ const OrderManagement = () => {
           )}
         </tbody>
       </Table>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <Row className="mt-4">
+          <Col className="d-flex justify-content-center">
+            <Pagination
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={handlePageChange}
+            />
+          </Col>
+        </Row>
+      )}
     </Container>
   );
 };

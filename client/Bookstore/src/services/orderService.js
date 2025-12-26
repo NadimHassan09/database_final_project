@@ -57,11 +57,12 @@ export const getOrderConfirmation = async (orderId) => {
 
 /**
  * Get all replenishment orders (Admin only)
+ * @param {object} params - Query parameters (page, limit)
  * @returns {Promise} API response
  */
-export const getReplenishmentOrders = async () => {
+export const getReplenishmentOrders = async (params = {}) => {
   try {
-    const response = await api.get('/orders');
+    const response = await api.get('/orders', { params });
     return response.data;
   } catch (error) {
     throw error;

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Form, Button, Alert } from 'react-bootstrap';
+import { Container, Row, Col, Card, Form, Button, Alert, Badge } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { addBook, getAuthors, getPublishers } from '../../services/bookService';
 import { validateRequired, validateISBN, validateQuantity } from '../../utils/validators';
@@ -17,6 +17,7 @@ const AddBook = () => {
     publisher_id: '',
     authors: [], // Array of author names (strings)
   });
+  const [newAuthorName, setNewAuthorName] = useState(''); // For adding new authors
   
   const VALID_CATEGORIES = ['Science', 'Art', 'Religion', 'History', 'Geography'];
   const [authors, setAuthors] = useState([]);
@@ -86,6 +87,32 @@ const AddBook = () => {
         ? prev.authors.filter(name => name !== authorName)
         : [...prev.authors, authorName],
     }));
+    // Clear error when author is selected
+    if (errors.authors) {
+      setErrors(prev => ({ ...prev, authors: '' }));
+    }
+  };
+
+  const handleAddNewAuthor = () => {
+    const trimmedName = newAuthorName.trim();
+    if (trimmedName && !formData.authors.includes(trimmedName)) {
+      setFormData(prev => ({
+        ...prev,
+        authors: [...prev.authors, trimmedName],
+      }));
+      setNewAuthorName('');
+      // Clear error when author is added
+      if (errors.authors) {
+        setErrors(prev => ({ ...prev, authors: '' }));
+      }
+    }
+  };
+
+  const handleRemoveAuthor = (authorName) => {
+    setFormData(prev => ({
+      ...prev,
+      authors: prev.authors.filter(name => name !== authorName),
+    }));
   };
 
   const validate = () => {
@@ -136,16 +163,41 @@ const AddBook = () => {
     setError(null);
 
     try {
+      // Ensure authors is an array of strings
+      const authorsArray = Array.isArray(formData.authors) 
+        ? formData.authors.filter(author => author && typeof author === 'string' && author.trim().length > 0)
+        : [];
+      
+      if (authorsArray.length === 0) {
+        setErrors(prev => ({ ...prev, authors: 'At least one author is required' }));
+        setLoading(false);
+        return;
+      }
+
       const bookData = {
-        ...formData,
+        isbn: formData.isbn,
+        title: formData.title,
         price: parseFloat(formData.price),
         publication_year: parseInt(formData.publication_year),
+        category: formData.category || null,
         quantity_in_stock: parseInt(formData.quantity_in_stock),
         min_threshold: parseInt(formData.min_threshold),
         publisher_id: parseInt(formData.publisher_id),
+        authors: authorsArray, // Explicitly set authors array
       };
 
+      // Debug log
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Submitting book data:', { ...bookData, authors: bookData.authors });
+      }
+
       await addBook(bookData);
+      
+      // Dispatch event to notify BookManagement to refresh
+      window.dispatchEvent(new CustomEvent('bookAdded', { 
+        detail: { isbn: bookData.isbn, title: bookData.title } 
+      }));
+      
       navigate('/admin/books');
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to add book. Please try again.');
@@ -319,12 +371,61 @@ const AddBook = () => {
 
             <Form.Group className="mb-3">
               <Form.Label>Authors *</Form.Label>
-              <div className="border p-3" style={{ maxHeight: '200px', overflowY: 'auto' }}>
-                {authors.length === 0 ? (
-                  <p className="text-muted">No authors available. Please add authors first.</p>
-                ) : (
-                  authors.map((author, index) => {
+              
+              {/* Add new author input */}
+              <div className="mb-3 d-flex gap-2">
+                <Form.Control
+                  type="text"
+                  placeholder="Enter author name and click Add"
+                  value={newAuthorName}
+                  onChange={(e) => setNewAuthorName(e.target.value)}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddNewAuthor();
+                    }
+                  }}
+                />
+                <Button 
+                  variant="outline-primary" 
+                  onClick={handleAddNewAuthor}
+                  disabled={!newAuthorName.trim()}
+                >
+                  Add Author
+                </Button>
+              </div>
+
+              {/* Selected authors */}
+              {formData.authors.length > 0 && (
+                <div className="mb-3">
+                  <Form.Label className="small">Selected Authors:</Form.Label>
+                  <div className="d-flex flex-wrap gap-2">
+                    {formData.authors.map((authorName, index) => (
+                      <Badge key={index} bg="primary" className="p-2 d-flex align-items-center gap-2">
+                        {authorName}
+                        <Button
+                          variant="link"
+                          className="p-0 text-white"
+                          style={{ fontSize: '0.8rem', textDecoration: 'none' }}
+                          onClick={() => handleRemoveAuthor(authorName)}
+                        >
+                          ×
+                        </Button>
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Existing authors list (optional - for selecting from existing) */}
+              {authors.length > 0 && (
+                <div className="border p-3" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                  <Form.Label className="small text-muted">Or select from existing authors:</Form.Label>
+                  {authors.map((author, index) => {
                     const authorName = author.name || author;
+                    if (formData.authors.includes(authorName)) {
+                      return null; // Don't show already selected authors
+                    }
                     return (
                       <Form.Check
                         key={authorName || index}
@@ -335,11 +436,12 @@ const AddBook = () => {
                         onChange={() => handleAuthorChange(authorName)}
                       />
                     );
-                  })
-                )}
-              </div>
+                  })}
+                </div>
+              )}
+              
               {errors.authors && (
-                <div className="text-danger small">{errors.authors}</div>
+                <div className="text-danger small mt-2">{errors.authors}</div>
               )}
             </Form.Group>
 

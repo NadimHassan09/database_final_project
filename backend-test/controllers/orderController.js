@@ -3,11 +3,19 @@ import { Order } from '../models/Order.js';
 
 export const getAllOrders = async (req, res, next) => {
   try {
-    const orders = await Order.findAll();
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    
+    const result = await Order.findAll(page, limit);
 
     res.json({
       success: true,
-      data: { orders }
+      data: {
+        orders: result.orders,
+        total: result.total,
+        page: result.page,
+        totalPages: result.totalPages
+      }
     });
   } catch (error) {
     next(error);

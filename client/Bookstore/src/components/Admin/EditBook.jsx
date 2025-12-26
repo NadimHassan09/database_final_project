@@ -166,6 +166,16 @@ const EditBook = () => {
       };
 
       await updateBook(isbn, bookData);
+      
+      // Dispatch event to notify BookManagement to refresh
+      window.dispatchEvent(new CustomEvent('bookUpdated', { 
+        detail: { isbn, title: bookData.title } 
+      }));
+      
+      // Dispatch event to notify OrderManagement to check for new auto-orders
+      // (trigger may have created a new order if stock dropped below threshold)
+      window.dispatchEvent(new CustomEvent('newReplenishmentOrder'));
+      
       navigate('/admin/books');
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to update book. Please try again.');

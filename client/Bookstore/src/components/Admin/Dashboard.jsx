@@ -1,4 +1,4 @@
-import { Container, Row, Col, Card } from 'react-bootstrap';
+import { Row, Col, Card } from 'react-bootstrap';
 import { useAuth } from '../../context/AuthContext';
 import { formatPrice } from '../../utils/formatters';
 
@@ -14,7 +14,7 @@ const Dashboard = () => {
   };
 
   return (
-    <Container className="my-4">
+    <div>
       <h2 className="mb-4">Admin Dashboard</h2>
       <p className="text-muted">Welcome back, {user?.first_name || user?.username}!</p>
 
@@ -52,46 +52,7 @@ const Dashboard = () => {
           </Card>
         </Col>
       </Row>
-
-      <Row>
-        <Col md={6}>
-          <Card>
-            <Card.Header>
-              <h5>Quick Actions</h5>
-            </Card.Header>
-            <Card.Body>
-              <ul className="list-unstyled">
-                <li className="mb-2">
-                  <a href="#/admin/books" className="text-decoration-none">
-                    Manage Books
-                  </a>
-                </li>
-                <li className="mb-2">
-                  <a href="#/admin/orders" className="text-decoration-none">
-                    Manage Orders
-                  </a>
-                </li>
-                <li className="mb-2">
-                  <a href="#/admin/reports" className="text-decoration-none">
-                    View Reports
-                  </a>
-                </li>
-              </ul>
-            </Card.Body>
-          </Card>
-        </Col>
-        <Col md={6}>
-          <Card>
-            <Card.Header>
-              <h5>Recent Activity</h5>
-            </Card.Header>
-            <Card.Body>
-              <p className="text-muted">Recent activity will be displayed here.</p>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
-    </Container>
+    </div>
   );
 };
 

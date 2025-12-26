@@ -104,19 +104,12 @@ const Cart = () => {
                     return (
                       <tr key={itemId}>
                         <td>
-                          <div className="d-flex align-items-center">
-                            <img
-                              src={item.image || 'https://via.placeholder.com/50x70?text=Book'}
-                              alt={item.title}
-                              style={{ width: '50px', height: '70px', objectFit: 'cover', marginRight: '10px' }}
-                            />
-                            <div>
-                              <strong>{item.title}</strong>
-                              <br />
-                              <small className="text-muted">
-                                {formatAuthors(item.authors || item.authors_string)}
-                              </small>
-                            </div>
+                          <div>
+                            <strong>{item.title}</strong>
+                            <br />
+                            <small className="text-muted">
+                              {formatAuthors(item.authors || item.authors_string)}
+                            </small>
                           </div>
                         </td>
                         <td>{formatPrice(price)}</td>

@@ -5,7 +5,7 @@
 .modern-navbar {
   background: linear-gradient(to bottom, #FFFFFF 0%, #FAFAFA 100%);
   border: none !important;
-  border-bottom: 1px solid rgba(229, 229, 229, 0.3);
+  border-bottom: 2px solid #dee2e6;
   padding: 0.75rem 0;
   position: sticky;
   top: var(--header-height); /* Position below the header using CSS variable */

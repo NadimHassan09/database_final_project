@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Button, Badge, Alert, Form } from 'react-bootstrap';
+import { Container, Card, Button, Badge, Alert, Form } from 'react-bootstrap';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getBookByISBN } from '../../services/bookService';
 import { formatPrice, formatISBN } from '../../utils/formatters';
@@ -199,30 +199,15 @@ const BookDetails = () => {
   const stockStatus = getStockStatus(stockQty, book.min_threshold);
 
   return (
-    <Container className="my-4">
-      <Button variant="outline-secondary" className="mb-3" onClick={() => navigate(-1)}>
-        ← Back
-      </Button>
+    <Container className="my-4 d-flex justify-content-center">
+      <div style={{ width: '60%', minHeight: '100vh' }}>
+        {error && (
+          <Alert variant="danger" dismissible onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
 
-      {error && (
-        <Alert variant="danger" dismissible onClose={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
-
-      <Row>
-        <Col md={4}>
-          <Card>
-            <Card.Img
-              variant="top"
-              src={book.image || book.cover_image || 'https://via.placeholder.com/400x600?text=Book'}
-              style={{ height: '600px', objectFit: 'cover' }}
-            />
-          </Card>
-        </Col>
-
-        <Col md={8}>
-          <Card>
+        <Card style={{ minHeight: '100vh' }}>
             <Card.Body>
               <h2>{book.title}</h2>
               <p className="text-muted">
@@ -254,11 +239,6 @@ const BookDetails = () => {
                 // Admin view: Replenishment Order
                 <>
                   <div className="mb-3">
-                    <Alert variant="info">
-                      <strong>Admin Mode:</strong> Create a replenishment order to request stock from the publisher.
-                    </Alert>
-                  </div>
-                  <div className="mb-3">
                     <Form.Group>
                       <Form.Label>Order Quantity</Form.Label>
                       <Form.Control
@@ -289,8 +269,8 @@ const BookDetails = () => {
                     </Button>
                   </div>
                 </>
-              ) : (
-                // Customer view: Add to Cart
+              ) : !isAdmin ? (
+                // Customer view: Add to Cart (only show if not admin)
                 <>
                   {stockStatus.available && (
                     <div className="mb-3">
@@ -330,11 +310,10 @@ const BookDetails = () => {
                     </Button>
                   </div>
                 </>
-              )}
+              ) : null}
             </Card.Body>
           </Card>
-        </Col>
-      </Row>
+        </div>
     </Container>
   );
 };

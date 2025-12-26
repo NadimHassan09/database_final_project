@@ -184,12 +184,19 @@ export const Book = {
       );
 
       // Insert book-author relationships
-      if (bookData.authors && Array.isArray(bookData.authors)) {
-        const authorValues = bookData.authors.map(authorName => [bookData.isbn, authorName]);
-        await connection.query(
-          'INSERT INTO author (ISBN, AuthorName) VALUES ?',
-          [authorValues]
-        );
+      if (bookData.authors && Array.isArray(bookData.authors) && bookData.authors.length > 0) {
+        // Filter out empty strings and ensure all are valid author names
+        const validAuthors = bookData.authors
+          .filter(author => author && typeof author === 'string' && author.trim().length > 0)
+          .map(author => author.trim());
+        
+        if (validAuthors.length > 0) {
+          const authorValues = validAuthors.map(authorName => [bookData.isbn, authorName]);
+          await connection.query(
+            'INSERT INTO author (ISBN, AuthorName) VALUES ?',
+            [authorValues]
+          );
+        }
       }
 
       await connection.commit();

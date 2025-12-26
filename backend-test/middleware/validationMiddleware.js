@@ -48,7 +48,7 @@ export const validateLogin = (req, res, next) => {
 };
 
 export const validateBook = (req, res, next) => {
-  const { isbn, title, price, publisher_id, author_ids } = req.body;
+  const { isbn, title, price, publisher_id, authors, author_ids } = req.body;
 
   if (!isbn || isbn.trim().length < 10) {
     return res.status(400).json({
@@ -78,10 +78,43 @@ export const validateBook = (req, res, next) => {
     });
   }
 
-  if (!author_ids || !Array.isArray(author_ids) || author_ids.length === 0) {
+  // Check for authors (array of author names) or author_ids (for backward compatibility)
+  const authorsArray = authors || author_ids;
+  
+  // Debug log
+  if (process.env.NODE_ENV === 'development') {
+    console.log('validateBook - authors check:', {
+      authors,
+      author_ids,
+      authorsArray,
+      isArray: Array.isArray(authorsArray),
+      length: authorsArray?.length
+    });
+  }
+  
+  if (!authorsArray || !Array.isArray(authorsArray) || authorsArray.length === 0) {
     return res.status(400).json({
       success: false,
       message: 'At least one author is required'
+    });
+  }
+
+  // Validate that authors array contains valid strings
+  const validAuthors = authorsArray.filter(author => {
+    if (typeof author === 'string') {
+      return author.trim().length > 0;
+    }
+    // Allow objects with name property for backward compatibility
+    if (typeof author === 'object' && author !== null && author.name) {
+      return author.name.trim().length > 0;
+    }
+    return false;
+  });
+  
+  if (validAuthors.length === 0) {
+    return res.status(400).json({
+      success: false,
+      message: 'At least one valid author name is required'
     });
   }
 

@@ -55,27 +55,6 @@ function Navigation() {
                       >
                         Dashboard
                       </Nav.Link>
-                      <Nav.Link 
-                        as={Link} 
-                        to="/admin/books" 
-                        className={`modern-nav-link ${isActive('/admin/books') ? 'active' : ''}`}
-                      >
-                        Books
-                      </Nav.Link>
-                      <Nav.Link 
-                        as={Link} 
-                        to="/admin/orders" 
-                        className={`modern-nav-link ${isActive('/admin/orders') ? 'active' : ''}`}
-                      >
-                        Orders
-                      </Nav.Link>
-                      <Nav.Link 
-                        as={Link} 
-                        to="/admin/reports" 
-                        className={`modern-nav-link ${isActive('/admin/reports') ? 'active' : ''}`}
-                      >
-                        Reports
-                      </Nav.Link>
                     </>
                   ) : (
                     <>
@@ -85,20 +64,6 @@ function Navigation() {
                         className={`modern-nav-link ${isActive('/customer/books') ? 'active' : ''}`}
                       >
                         Browse
-                      </Nav.Link>
-                      <Nav.Link 
-                        as={Link} 
-                        to="/customer/search" 
-                        className={`modern-nav-link ${isActive('/customer/search') ? 'active' : ''}`}
-                      >
-                        Search
-                      </Nav.Link>
-                      <Nav.Link 
-                        as={Link} 
-                        to="/customer/orders" 
-                        className={`modern-nav-link ${isActive('/customer/orders') ? 'active' : ''}`}
-                      >
-                        My Orders
                       </Nav.Link>
                     </>
                   )}

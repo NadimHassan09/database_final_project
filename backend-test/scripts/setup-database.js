@@ -44,7 +44,8 @@ async function setupDatabase() {
     console.log('⚙️  Creating triggers...');
     let triggers = readFileSync(join(__dirname, '../database/triggers-new.sql'), 'utf8');
     
-    // Remove DELIMITER statements (not needed for mysql2)
+    // Remove USE statement and DELIMITER statements (not needed for mysql2)
+    triggers = triggers.replace(/USE order_processing;/g, '');
     triggers = triggers.replace(/DELIMITER \$\$/g, '');
     triggers = triggers.replace(/DELIMITER ;/g, '');
     
@@ -54,12 +55,17 @@ async function setupDatabase() {
       const cleaned = statement.trim();
       if (cleaned && !cleaned.startsWith('--') && cleaned.length > 10) {
         try {
-          await connection.query(cleaned);
-        } catch (err) {
-          // Ignore duplicate trigger errors
-          if (!err.message.includes('already exists')) {
-            console.warn('Warning creating trigger:', err.message);
+          // Extract trigger name to drop it first if it exists
+          const triggerNameMatch = cleaned.match(/CREATE TRIGGER `?(\w+)`?/i);
+          if (triggerNameMatch) {
+            const triggerName = triggerNameMatch[1];
+            await connection.query(`DROP TRIGGER IF EXISTS \`${triggerName}\``);
           }
+          await connection.query(cleaned);
+          console.log(`✅ Trigger ${triggerNameMatch ? triggerNameMatch[1] : 'unknown'} created`);
+        } catch (err) {
+          console.error('❌ Error creating trigger:', err.message);
+          throw err;
         }
       }
     }

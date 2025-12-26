@@ -2,8 +2,10 @@
 import pool from '../config/database.js';
 
 export const Order = {
-  // Get all orders
-  async findAll() {
+  // Get all orders with pagination
+  async findAll(page = 1, limit = 20) {
+    const offset = (page - 1) * limit;
+    
     const [rows] = await pool.execute(
       `SELECT op.*, b.Title as book_title, p.Name as publisher_name,
        a.Name as admin_name
@@ -11,10 +13,12 @@ export const Order = {
        LEFT JOIN book b ON op.ISBN = b.ISBN
        LEFT JOIN publisher p ON op.PublisherID = p.PublisherID
        LEFT JOIN admin a ON op.AdminID = a.AdminID
-       ORDER BY op.OrderDate DESC`
+       ORDER BY op.OrderDate DESC
+       LIMIT ? OFFSET ?`,
+      [limit, offset]
     );
     
-    return rows.map(row => ({
+    const orders = rows.map(row => ({
       order_id: row.OrderID,
       book_isbn: row.ISBN,
       publisher_id: row.PublisherID,
@@ -27,6 +31,17 @@ export const Order = {
       publisher_name: row.publisher_name,
       admin_name: row.admin_name
     }));
+
+    // Get total count
+    const [countRows] = await pool.execute('SELECT COUNT(*) as total FROM order_publisher');
+    const total = parseInt(countRows[0].total);
+
+    return {
+      orders,
+      total,
+      page,
+      totalPages: Math.ceil(total / limit)
+    };
   },
 
   // Find order by ID
@@ -107,18 +122,18 @@ export const Order = {
         return this.findById(orderId); // Return using pool connection
       }
 
-      // Get current book stock before update (for verification)
-      const [bookRows] = await connection.execute(
+      // Get current stock before update (for verification)
+      const [bookBefore] = await connection.execute(
         `SELECT StockQty FROM book WHERE ISBN = ?`,
         [order.ISBN]
       );
       
-      if (bookRows.length === 0) {
+      if (bookBefore.length === 0) {
         throw new Error(`Book with ISBN ${order.ISBN} not found`);
       }
       
-      const currentStock = bookRows[0].StockQty;
-      const expectedStock = currentStock + order.QuantityOrdered;
+      const stockBefore = bookBefore[0].StockQty;
+      const expectedStockAfter = stockBefore + order.QuantityOrdered;
 
       // Update order status to Confirmed
       // The trigger `confirm_restock` will automatically update book stock when status changes to 'Confirmed'
@@ -127,42 +142,34 @@ export const Order = {
         [orderId]
       );
 
-      // Verify stock was updated by trigger
-      const [verifyRows] = await connection.execute(
+      // Verify trigger updated the stock (check after a brief moment for trigger to fire)
+      // If trigger didn't work, update explicitly as fallback
+      const [bookAfter] = await connection.execute(
         `SELECT StockQty FROM book WHERE ISBN = ?`,
         [order.ISBN]
       );
       
-      const actualStock = verifyRows[0].StockQty;
+      const stockAfter = bookAfter[0].StockQty;
       
-      // If trigger updated stock, we might have double-update (trigger + explicit)
-      // Or if trigger didn't fire, stock won't be updated
-      // So we'll set it to the correct value explicitly
-      if (actualStock !== expectedStock) {
-        // Update to correct value (handles both cases: trigger didn't fire, or double-update)
+      // If trigger didn't update stock, do it explicitly
+      if (stockAfter !== expectedStockAfter) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`Trigger didn't update stock. Expected: ${expectedStockAfter}, Got: ${stockAfter}. Updating explicitly...`);
+        }
         const [updateResult] = await connection.execute(
           `UPDATE book SET StockQty = ? WHERE ISBN = ?`,
-          [expectedStock, order.ISBN]
+          [expectedStockAfter, order.ISBN]
         );
         
         if (updateResult.affectedRows === 0) {
           throw new Error(`Failed to update stock for book with ISBN ${order.ISBN}`);
         }
-        
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`Stock corrected: Was ${actualStock}, set to ${expectedStock} for book ${order.ISBN}`);
-        }
       }
 
       await connection.commit();
 
-      // Return updated order with stock info
-      const updatedOrder = await this.findById(orderId);
-      if (updatedOrder) {
-        updatedOrder.old_stock = currentStock;
-        updatedOrder.new_stock = newStock;
-      }
-      return updatedOrder;
+      // Return updated order
+      return this.findById(orderId);
     } catch (error) {
       await connection.rollback();
       throw error;

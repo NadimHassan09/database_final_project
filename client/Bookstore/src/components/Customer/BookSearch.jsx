@@ -5,6 +5,7 @@ import { searchBooks } from '../../services/bookService';
 import { formatPrice } from '../../utils/formatters';
 import { getStockStatus, formatAuthors } from '../../utils/helpers';
 import { useCart } from '../../context/CartContext';
+import { useAuth } from '../../context/AuthContext';
 import { useNotification } from '../../context/NotificationContext';
 import SearchBar from '../Common/SearchBar';
 import LoadingSpinner from '../LoadingSpinner';
@@ -17,6 +18,7 @@ const BookSearch = () => {
   const [hasSearched, setHasSearched] = useState(false);
 
   const { addToCart } = useCart();
+  const { isAdmin } = useAuth();
   const { showSuccess, showError } = useNotification();
   const navigate = useNavigate();
 
@@ -129,19 +131,13 @@ const BookSearch = () => {
                   return (
                     <Col key={book.isbn} md={4} lg={3} className="mb-4">
                       <Card className="h-100">
-                        <Card.Img
-                          variant="top"
-                          src={book.image || book.cover_image || 'https://via.placeholder.com/200x300?text=Book'}
-                          style={{ height: '300px', objectFit: 'cover', cursor: 'pointer' }}
-                          onClick={() => navigate(`/customer/books/${encodeURIComponent(book.isbn)}`)}
-                        />
                         <Card.Body className="d-flex flex-column">
-                          <Card.Title className="h6">{book.title}</Card.Title>
-                          <Card.Text className="text-muted small">
+                          <Card.Title className="h6 mb-2">{book.title}</Card.Title>
+                          <Card.Text className="text-muted small mb-3">
                             {formatAuthors(book.authors || book.authors_string)}
                           </Card.Text>
                           <div className="mt-auto">
-                            <div className="d-flex justify-content-between align-items-center mb-2">
+                            <div className="d-flex justify-content-between align-items-center mb-3">
                               <strong>{formatPrice(book.price)}</strong>
                               <Badge bg={stockStatus.color}>{stockStatus.text}</Badge>
                             </div>
@@ -153,14 +149,16 @@ const BookSearch = () => {
                               >
                                 View Details
                               </Button>
-                              <Button
-                                variant="outline-primary"
-                                size="sm"
-                                onClick={() => handleAddToCart(book)}
-                                disabled={!stockStatus.available}
-                              >
-                                Add to Cart
-                              </Button>
+                              {!isAdmin && (
+                                <Button
+                                  variant="outline-primary"
+                                  size="sm"
+                                  onClick={() => handleAddToCart(book)}
+                                  disabled={!stockStatus.available}
+                                >
+                                  Add to Cart
+                                </Button>
+                              )}
                             </div>
                           </div>
                         </Card.Body>
