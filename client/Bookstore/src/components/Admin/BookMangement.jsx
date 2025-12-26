@@ -17,6 +17,17 @@ const BookManagement = () => {
 
   useEffect(() => {
     loadBooks();
+    
+    // Listen for order confirmation events to refresh book list
+    const handleOrderConfirmed = () => {
+      loadBooks();
+    };
+    
+    window.addEventListener('orderConfirmed', handleOrderConfirmed);
+    
+    return () => {
+      window.removeEventListener('orderConfirmed', handleOrderConfirmed);
+    };
   }, []);
 
   const loadBooks = async () => {
@@ -24,10 +35,31 @@ const BookManagement = () => {
       setLoading(true);
       setError(null);
       const response = await getBooks();
-      setBooks(response.books || response.data || []);
+      
+      // Backend returns: { success: true, data: { books: [...], total, page, totalPages } }
+      // bookService.getBooks() returns response.data, so:
+      // response = { success: true, data: { books: [...], total, page, totalPages } }
+      // response.data = { books: [...], total, page, totalPages }
+      // response.data.books = [...]
+      
+      let booksArray = [];
+      
+      if (response && response.data) {
+        // Standard backend response structure
+        booksArray = Array.isArray(response.data.books) ? response.data.books : [];
+      } else if (Array.isArray(response.books)) {
+        // Fallback: direct books array
+        booksArray = response.books;
+      } else if (Array.isArray(response)) {
+        // Fallback: response is directly an array
+        booksArray = response;
+      }
+      
+      setBooks(booksArray);
     } catch (err) {
       setError('Failed to load books. Please try again.');
       console.error('Error loading books:', err);
+      setBooks([]); // Ensure books is always an array
     } finally {
       setLoading(false);
     }
@@ -96,7 +128,7 @@ const BookManagement = () => {
             </tr>
           ) : (
             books.map((book) => {
-              const stockStatus = getStockStatus(book.quantity_in_stock, book.min_threshold);
+              const stockStatus = getStockStatus(book.stock_qty || book.quantity_in_stock, book.min_threshold || book.threshold_qty);
               return (
                 <tr key={book.isbn}>
                   <td>{formatISBN(book.isbn)}</td>
@@ -105,7 +137,7 @@ const BookManagement = () => {
                     {formatAuthors(book.authors || book.authors_string, 'N/A')}
                   </td>
                   <td>{formatPrice(book.price)}</td>
-                  <td>{book.quantity_in_stock || 0}</td>
+                  <td>{book.stock_qty || book.quantity_in_stock || 0}</td>
                   <td>
                     <Badge bg={stockStatus.color}>{stockStatus.text}</Badge>
                   </td>

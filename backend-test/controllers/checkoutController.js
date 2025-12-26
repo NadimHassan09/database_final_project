@@ -25,21 +25,25 @@ export const checkout = async (req, res, next) => {
     const saleItems = [];
 
     for (const item of cartData.items) {
-      const book = await Book.findByISBN(item.book_isbn);
+      const itemISBN = item.isbn || item.book_isbn;
+      const book = await Book.findByISBN(itemISBN);
       
       if (!book) {
         await connection.rollback();
         return res.status(404).json({
           success: false,
-          message: `Book ${item.book_isbn} not found`
+          message: `Book ${itemISBN} not found`
         });
       }
 
-      if (book.quantity_in_stock < item.quantity) {
+      // Use stock_qty or quantity_in_stock (for backward compatibility)
+      const availableStock = book.stock_qty !== undefined ? book.stock_qty : (book.quantity_in_stock || 0);
+      
+      if (availableStock < item.quantity) {
         await connection.rollback();
         return res.status(400).json({
           success: false,
-          message: `Insufficient stock for ${book.title}. Only ${book.quantity_in_stock} available.`
+          message: `Insufficient stock for ${book.title}. Only ${availableStock} available.`
         });
       }
 
@@ -47,17 +51,23 @@ export const checkout = async (req, res, next) => {
       totalAmount += itemTotal;
 
       saleItems.push({
-        book_isbn: item.book_isbn,
+        isbn: item.isbn || item.book_isbn,
+        book_isbn: item.isbn || item.book_isbn,
         quantity: item.quantity,
-        unit_price: book.price
+        unit_price: book.price,
+        price_at_sale: book.price
       });
     }
 
     // Create sale
     const sale = await Sale.createSale({
       user_id: req.user.user_id,
+      customerId: req.user.user_id,
       total_amount: totalAmount,
-      payment_method: req.body.payment_method || 'credit_card'
+      payment_method: req.body.payment_method || 'credit_card',
+      payment_card: req.body.payment_card || req.body.card_number || null,
+      expiry_date: req.body.expiry_date || req.body.expiryDate || null,
+      items: saleItems
     });
 
     // Clear cart

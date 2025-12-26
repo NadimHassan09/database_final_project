@@ -6,7 +6,9 @@ import { formatPrice, formatISBN } from '../../utils/formatters';
 import { getStockStatus, formatAuthors } from '../../utils/helpers';
 import { validateQuantity } from '../../utils/validators';
 import { useCart } from '../../context/CartContext';
+import { useAuth } from '../../context/AuthContext';
 import { useNotification } from '../../context/NotificationContext';
+import { createReplenishmentOrder } from '../../services/orderService';
 import LoadingSpinner from '../LoadingSpinner';
 
 const BookDetails = () => {
@@ -16,14 +18,31 @@ const BookDetails = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [quantityError, setQuantityError] = useState('');
+  const [orderQuantity, setOrderQuantity] = useState(20); // Default replenishment quantity
+  const [creatingOrder, setCreatingOrder] = useState(false);
 
   const { addToCart } = useCart();
+  const { isAdmin, user } = useAuth();
   const { showSuccess, showError } = useNotification();
   const navigate = useNavigate();
 
   useEffect(() => {
     loadBook();
-  }, [isbn]);
+    
+    // Listen for order confirmation events to refresh book data
+    const handleOrderConfirmed = (event) => {
+      // Only refresh if this is the book that was restocked
+      if (event.detail?.bookISBN === book?.isbn) {
+        loadBook();
+      }
+    };
+    
+    window.addEventListener('orderConfirmed', handleOrderConfirmed);
+    
+    return () => {
+      window.removeEventListener('orderConfirmed', handleOrderConfirmed);
+    };
+  }, [isbn, book?.isbn]);
 
   const loadBook = async () => {
     try {
@@ -79,7 +98,8 @@ const BookDetails = () => {
     setQuantity(value);
 
     if (book) {
-      const validation = validateQuantity(value, book.quantity_in_stock);
+      const stockQty = book.stock_qty !== undefined ? book.stock_qty : (book.quantity_in_stock !== undefined ? book.quantity_in_stock : 0);
+      const validation = validateQuantity(value, stockQty);
       if (!validation.isValid) {
         setQuantityError(validation.message);
       } else {
@@ -93,7 +113,8 @@ const BookDetails = () => {
       return;
     }
 
-    const validation = validateQuantity(quantity, book.quantity_in_stock);
+    const stockQty = book.stock_qty !== undefined ? book.stock_qty : (book.quantity_in_stock !== undefined ? book.quantity_in_stock : 0);
+    const validation = validateQuantity(quantity, stockQty);
     if (!validation.isValid) {
       setQuantityError(validation.message);
       return;
@@ -104,6 +125,47 @@ const BookDetails = () => {
       showSuccess(`${quantity} x ${book.title} added to cart!`);
     } else {
       showError(result.error || 'Failed to add to cart');
+    }
+  };
+
+  const handleCreateReplenishmentOrder = async () => {
+    if (!book || !book.publisher_id) {
+      showError('Book publisher information is missing');
+      return;
+    }
+
+    if (orderQuantity <= 0) {
+      showError('Order quantity must be greater than 0');
+      return;
+    }
+
+    setCreatingOrder(true);
+    try {
+      const orderData = {
+        isbn: book.isbn,
+        book_isbn: book.isbn,
+        publisher_id: book.publisher_id,
+        admin_id: user?.user_id || 1, // Use logged-in admin ID
+        quantity_ordered: orderQuantity,
+        status: 'Pending'
+      };
+
+      const response = await createReplenishmentOrder(orderData);
+      
+      if (response.success) {
+        showSuccess(`Replenishment order created successfully for ${orderQuantity} copies of ${book.title}`);
+        // Optionally navigate to orders page
+        setTimeout(() => {
+          navigate('/admin/orders');
+        }, 1500);
+      } else {
+        showError(response.message || 'Failed to create replenishment order');
+      }
+    } catch (err) {
+      const errorMessage = err.response?.data?.message || err.message || 'Failed to create replenishment order';
+      showError(errorMessage);
+    } finally {
+      setCreatingOrder(false);
     }
   };
 
@@ -133,7 +195,8 @@ const BookDetails = () => {
     );
   }
 
-  const stockStatus = getStockStatus(book.quantity_in_stock, book.min_threshold);
+  const stockQty = book.stock_qty !== undefined ? book.stock_qty : (book.quantity_in_stock !== undefined ? book.quantity_in_stock : 0);
+  const stockStatus = getStockStatus(stockQty, book.min_threshold);
 
   return (
     <Container className="my-4">
@@ -178,49 +241,96 @@ const BookDetails = () => {
               <div className="mb-3">
                 <p><strong>Publication Year:</strong> {book.publication_year || 'N/A'}</p>
                 <p><strong>Publisher:</strong> {book.publisher?.name || book.publisher_name || 'N/A'}</p>
-                <p><strong>Stock Available:</strong> {book.quantity_in_stock !== undefined ? book.quantity_in_stock : 0} units</p>
+                <p><strong>Stock Available:</strong> {book.stock_qty !== undefined ? book.stock_qty : (book.quantity_in_stock !== undefined ? book.quantity_in_stock : 0)} units</p>
                 {book.min_threshold !== undefined && (
                   <p><strong>Minimum Threshold:</strong> {book.min_threshold} units</p>
                 )}
+                {isAdmin && book.publisher_id && (
+                  <p className="text-muted"><small>Publisher ID: {book.publisher_id}</small></p>
+                )}
               </div>
 
-              {stockStatus.available && (
-                <div className="mb-3">
-                  <Form.Group>
-                    <Form.Label>Quantity</Form.Label>
-                    <Form.Control
-                      type="number"
-                      min="1"
-                      max={book.quantity_in_stock}
-                      value={quantity}
-                      onChange={handleQuantityChange}
-                      isInvalid={!!quantityError}
-                    />
-                    {quantityError && (
-                      <Form.Control.Feedback type="invalid">
-                        {quantityError}
-                      </Form.Control.Feedback>
-                    )}
-                  </Form.Group>
-                </div>
+              {isAdmin ? (
+                // Admin view: Replenishment Order
+                <>
+                  <div className="mb-3">
+                    <Alert variant="info">
+                      <strong>Admin Mode:</strong> Create a replenishment order to request stock from the publisher.
+                    </Alert>
+                  </div>
+                  <div className="mb-3">
+                    <Form.Group>
+                      <Form.Label>Order Quantity</Form.Label>
+                      <Form.Control
+                        type="number"
+                        min="1"
+                        value={orderQuantity}
+                        onChange={(e) => setOrderQuantity(parseInt(e.target.value) || 1)}
+                      />
+                      <Form.Text className="text-muted">
+                        Number of copies to order from the publisher
+                      </Form.Text>
+                    </Form.Group>
+                  </div>
+                  <div className="d-grid gap-2">
+                    <Button
+                      variant="primary"
+                      size="lg"
+                      onClick={handleCreateReplenishmentOrder}
+                      disabled={creatingOrder || orderQuantity <= 0}
+                    >
+                      {creatingOrder ? 'Creating Order...' : 'Create Replenishment Order'}
+                    </Button>
+                    <Button
+                      variant="outline-secondary"
+                      onClick={() => navigate('/admin/orders')}
+                    >
+                      View Replenishment Orders
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                // Customer view: Add to Cart
+                <>
+                  {stockStatus.available && (
+                    <div className="mb-3">
+                      <Form.Group>
+                        <Form.Label>Quantity</Form.Label>
+                        <Form.Control
+                          type="number"
+                          min="1"
+                          max={book.quantity_in_stock || book.stock_qty}
+                          value={quantity}
+                          onChange={handleQuantityChange}
+                          isInvalid={!!quantityError}
+                        />
+                        {quantityError && (
+                          <Form.Control.Feedback type="invalid">
+                            {quantityError}
+                          </Form.Control.Feedback>
+                        )}
+                      </Form.Group>
+                    </div>
+                  )}
+
+                  <div className="d-grid gap-2">
+                    <Button
+                      variant="primary"
+                      size="lg"
+                      onClick={handleAddToCart}
+                      disabled={!stockStatus.available || !!quantityError}
+                    >
+                      Add to Cart
+                    </Button>
+                    <Button
+                      variant="outline-secondary"
+                      onClick={() => navigate('/customer/cart')}
+                    >
+                      View Cart
+                    </Button>
+                  </div>
+                </>
               )}
-
-              <div className="d-grid gap-2">
-                <Button
-                  variant="primary"
-                  size="lg"
-                  onClick={handleAddToCart}
-                  disabled={!stockStatus.available || !!quantityError}
-                >
-                  Add to Cart
-                </Button>
-                <Button
-                  variant="outline-secondary"
-                  onClick={() => navigate('/customer/cart')}
-                >
-                  View Cart
-                </Button>
-              </div>
             </Card.Body>
           </Card>
         </Col>

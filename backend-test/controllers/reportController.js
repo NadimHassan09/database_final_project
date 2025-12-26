@@ -1,5 +1,6 @@
 // Report Controller
 import { Sale } from '../models/Sale.js';
+import { Order } from '../models/Order.js';
 
 export const getMonthlySales = async (req, res, next) => {
   try {
@@ -10,6 +11,7 @@ export const getMonthlySales = async (req, res, next) => {
       data: report
     });
   } catch (error) {
+    console.error('Error getting monthly sales:', error);
     next(error);
   }
 };
@@ -32,6 +34,7 @@ export const getDailySales = async (req, res, next) => {
       data: report
     });
   } catch (error) {
+    console.error('Error getting daily sales:', error);
     next(error);
   }
 };
@@ -45,6 +48,7 @@ export const getTopCustomers = async (req, res, next) => {
       data: { customers }
     });
   } catch (error) {
+    console.error('Error getting top customers:', error);
     next(error);
   }
 };
@@ -58,20 +62,23 @@ export const getTopBooks = async (req, res, next) => {
       data: { books }
     });
   } catch (error) {
+    console.error('Error getting top books:', error);
     next(error);
   }
 };
 
 export const getReplenishmentCount = async (req, res, next) => {
   try {
-    const { bookId } = req.params;
-    const count = await Sale.getReplenishmentCount(bookId);
+    const { bookISBN } = req.params;
+    const decodedISBN = decodeURIComponent(bookISBN);
+    const count = await Order.getReplenishmentCount(decodedISBN);
 
     res.json({
       success: true,
-      data: { count }
+      data: { count, book_isbn: decodedISBN }
     });
   } catch (error) {
+    console.error('Error getting replenishment count:', error);
     next(error);
   }
 };

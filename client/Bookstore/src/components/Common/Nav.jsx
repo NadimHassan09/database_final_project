@@ -10,11 +10,17 @@ import '../../styles/Navbar.css';
 
 function Navigation() {
   const { isAuthenticated, user, isAdmin, logout } = useAuth();
-  const { getCartItemCount } = useCart();
+  const { getCartItemCount, clearCart } = useCart();
   const navigate = useNavigate();
   const location = useLocation();
 
   const handleLogout = async () => {
+    // Clear cart on logout (TC-22)
+    try {
+      await clearCart();
+    } catch (err) {
+      console.error('Error clearing cart on logout:', err);
+    }
     await logout();
     navigate('/');
   };

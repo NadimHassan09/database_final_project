@@ -11,11 +11,14 @@ const AddBook = () => {
     title: '',
     price: '',
     publication_year: new Date().getFullYear(),
+    category: '',
     quantity_in_stock: 0,
     min_threshold: 10,
     publisher_id: '',
-    author_ids: [],
+    authors: [], // Array of author names (strings)
   });
+  
+  const VALID_CATEGORIES = ['Science', 'Art', 'Religion', 'History', 'Geography'];
   const [authors, setAuthors] = useState([]);
   const [publishers, setPublishers] = useState([]);
   const [errors, setErrors] = useState({});
@@ -34,10 +37,37 @@ const AddBook = () => {
         getAuthors(),
         getPublishers(),
       ]);
-      setAuthors(authorsData.authors || authorsData.data || []);
-      setPublishers(publishersData.publishers || publishersData.data || []);
+      
+      // Backend returns: { success: true, data: { authors: [...] } }
+      // Service returns response.data, so: { success: true, data: { authors: [...] } }
+      // response.data.data.authors = [...]
+      
+      let authorsArray = [];
+      if (authorsData && authorsData.data) {
+        authorsArray = Array.isArray(authorsData.data.authors) ? authorsData.data.authors : 
+                      Array.isArray(authorsData.data) ? authorsData.data : [];
+      } else if (Array.isArray(authorsData.authors)) {
+        authorsArray = authorsData.authors;
+      } else if (Array.isArray(authorsData)) {
+        authorsArray = authorsData;
+      }
+      
+      let publishersArray = [];
+      if (publishersData && publishersData.data) {
+        publishersArray = Array.isArray(publishersData.data.publishers) ? publishersData.data.publishers :
+                         Array.isArray(publishersData.data) ? publishersData.data : [];
+      } else if (Array.isArray(publishersData.publishers)) {
+        publishersArray = publishersData.publishers;
+      } else if (Array.isArray(publishersData)) {
+        publishersArray = publishersData;
+      }
+      
+      setAuthors(authorsArray);
+      setPublishers(publishersArray);
     } catch (err) {
       console.error('Error loading authors/publishers:', err);
+      setAuthors([]);
+      setPublishers([]);
     }
   };
 
@@ -49,13 +79,12 @@ const AddBook = () => {
     }
   };
 
-  const handleAuthorChange = (authorId) => {
-    const authorIdNum = parseInt(authorId);
+  const handleAuthorChange = (authorName) => {
     setFormData(prev => ({
       ...prev,
-      author_ids: prev.author_ids.includes(authorIdNum)
-        ? prev.author_ids.filter(id => id !== authorIdNum)
-        : [...prev.author_ids, authorIdNum],
+      authors: prev.authors.includes(authorName)
+        ? prev.authors.filter(name => name !== authorName)
+        : [...prev.authors, authorName],
     }));
   };
 
@@ -83,8 +112,13 @@ const AddBook = () => {
       newErrors.publisher_id = 'Publisher is required';
     }
 
-    if (formData.author_ids.length === 0) {
-      newErrors.author_ids = 'At least one author is required';
+    if (formData.authors.length === 0) {
+      newErrors.authors = 'At least one author is required';
+    }
+
+    // Category validation
+    if (formData.category && !VALID_CATEGORIES.includes(formData.category)) {
+      newErrors.category = `Category must be one of: ${VALID_CATEGORIES.join(', ')}`;
     }
 
     setErrors(newErrors);
@@ -205,6 +239,28 @@ const AddBook = () => {
 
               <Col md={4}>
                 <Form.Group className="mb-3">
+                  <Form.Label>Category</Form.Label>
+                  <Form.Select
+                    name="category"
+                    value={formData.category}
+                    onChange={handleChange}
+                    isInvalid={!!errors.category}
+                  >
+                    <option value="">Select Category (Optional)</option>
+                    {VALID_CATEGORIES.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </Form.Select>
+                  <Form.Control.Feedback type="invalid">
+                    {errors.category}
+                  </Form.Control.Feedback>
+                </Form.Group>
+              </Col>
+            </Row>
+
+            <Row>
+              <Col md={4}>
+                <Form.Group className="mb-3">
                   <Form.Label>Publisher *</Form.Label>
                   <Form.Select
                     name="publisher_id"
@@ -267,20 +323,23 @@ const AddBook = () => {
                 {authors.length === 0 ? (
                   <p className="text-muted">No authors available. Please add authors first.</p>
                 ) : (
-                  authors.map(author => (
-                    <Form.Check
-                      key={author.author_id}
-                      type="checkbox"
-                      id={`author-${author.author_id}`}
-                      label={author.name}
-                      checked={formData.author_ids.includes(author.author_id)}
-                      onChange={() => handleAuthorChange(author.author_id)}
-                    />
-                  ))
+                  authors.map((author, index) => {
+                    const authorName = author.name || author;
+                    return (
+                      <Form.Check
+                        key={authorName || index}
+                        type="checkbox"
+                        id={`author-${index}`}
+                        label={authorName}
+                        checked={formData.authors.includes(authorName)}
+                        onChange={() => handleAuthorChange(authorName)}
+                      />
+                    );
+                  })
                 )}
               </div>
-              {errors.author_ids && (
-                <div className="text-danger small">{errors.author_ids}</div>
+              {errors.authors && (
+                <div className="text-danger small">{errors.authors}</div>
               )}
             </Form.Group>
 

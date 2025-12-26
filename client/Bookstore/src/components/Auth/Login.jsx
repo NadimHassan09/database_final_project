@@ -13,7 +13,7 @@ const Login = () => {
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { login, error: authError } = useAuth();
+  const { login, error: authError, clearError } = useAuth();
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -48,19 +48,34 @@ const Login = () => {
     }
 
     setIsSubmitting(true);
-    const result = await login(formData.username, formData.password);
+    try {
+      const result = await login(formData.username, formData.password);
 
-    if (result.success) {
-      // Redirect based on user role
-      const user = JSON.parse(localStorage.getItem('user') || '{}');
-      if (user.user_type === 'admin' || user.role === 'admin') {
-        navigate('/admin');
+      if (result.success) {
+        // Get user from localStorage (set by AuthContext)
+        const storedUser = localStorage.getItem('user');
+        if (!storedUser) {
+          console.error('User not found in localStorage after login');
+          return;
+        }
+        
+        const user = JSON.parse(storedUser);
+        
+        // Redirect based on user role
+        if (user.user_type === 'admin') {
+          navigate('/admin');
+        } else {
+          navigate('/customer');
+        }
       } else {
-        navigate('/customer');
+        // Login failed, error is already set in AuthContext
+        console.error('Login failed:', result.error);
       }
+    } catch (error) {
+      console.error('Login error:', error);
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setIsSubmitting(false);
   };
 
   return (
@@ -73,7 +88,10 @@ const Login = () => {
             </Card.Header>
             <Card.Body>
               {authError && (
-                <Alert variant="danger" dismissible onClose={() => {}}>
+                <Alert variant="danger" dismissible onClose={() => {
+                  // Clear error when dismissed
+                  if (clearError) clearError();
+                }}>
                   {authError}
                 </Alert>
               )}

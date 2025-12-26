@@ -7,7 +7,8 @@ import api from './api';
 export const getMonthlySalesReport = async () => {
   try {
     const response = await api.get('/reports/monthly-sales');
-    return response.data;
+    // Backend returns: { success: true, data: { sales: [...], total_sales: ..., sales_count: ... } }
+    return response.data?.data || response.data;
   } catch (error) {
     throw error;
   }
@@ -23,7 +24,8 @@ export const getDailySalesReport = async (date) => {
     const response = await api.get('/reports/daily-sales', {
       params: { date },
     });
-    return response.data;
+    // Backend returns: { success: true, data: { sales: [...], total_sales: ..., sales_count: ... } }
+    return response.data?.data || response.data;
   } catch (error) {
     throw error;
   }
@@ -36,7 +38,8 @@ export const getDailySalesReport = async (date) => {
 export const getTopCustomersReport = async () => {
   try {
     const response = await api.get('/reports/top-customers');
-    return response.data;
+    // Backend returns: { success: true, data: { customers: [...] } }
+    return response.data?.data || response.data;
   } catch (error) {
     throw error;
   }
@@ -49,7 +52,8 @@ export const getTopCustomersReport = async () => {
 export const getTopBooksReport = async () => {
   try {
     const response = await api.get('/reports/top-books');
-    return response.data;
+    // Backend returns: { success: true, data: { books: [...] } }
+    return response.data?.data || response.data;
   } catch (error) {
     throw error;
   }
@@ -62,8 +66,9 @@ export const getTopBooksReport = async () => {
  */
 export const getReplenishmentCount = async (bookISBN) => {
   try {
-    const response = await api.get(`/reports/replenishment-count/${bookISBN}`);
-    return response.data;
+    const response = await api.get(`/reports/replenishment-count/${encodeURIComponent(bookISBN)}`);
+    // Backend returns: { success: true, data: { count: ..., book_isbn: ... } }
+    return response.data?.data || response.data;
   } catch (error) {
     throw error;
   }

@@ -96,3 +96,17 @@ export const confirmReplenishmentOrder = async (orderId) => {
   }
 };
 
+/**
+ * Create replenishment order (Admin only)
+ * @param {object} orderData - Order data (isbn, publisher_id, quantity_ordered)
+ * @returns {Promise} API response
+ */
+export const createReplenishmentOrder = async (orderData) => {
+  try {
+    const response = await api.post('/orders', orderData);
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
+};
+

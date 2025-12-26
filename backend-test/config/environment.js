@@ -13,7 +13,7 @@ export const config = {
   DB_PORT: process.env.DB_PORT || 3306,
   DB_USER: process.env.DB_USER || 'root',
   DB_PASSWORD: process.env.DB_PASSWORD || '',
-  DB_NAME: process.env.DB_NAME || 'backend_test',
+  DB_NAME: process.env.DB_NAME || 'order_processing',
   
   // JWT
   JWT_SECRET: process.env.JWT_SECRET || 'test-secret-key-change-in-production',

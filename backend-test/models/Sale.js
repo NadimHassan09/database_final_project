@@ -1,4 +1,4 @@
-// Sale Model
+// Sale Model - New Database Structure (customer_order and order_books)
 import pool from '../config/database.js';
 
 export const Sale = {
@@ -8,37 +8,47 @@ export const Sale = {
     try {
       await connection.beginTransaction();
 
-      // Create sale
-      const [saleResult] = await connection.execute(
-        `INSERT INTO Sales (user_id, total_amount, payment_method)
-         VALUES (?, ?, ?)`,
+      // Create customer order
+      const [orderResult] = await connection.execute(
+        `INSERT INTO customer_order (CustomerID, TotalAmount, PaymentCard, ExpiryDate)
+         VALUES (?, ?, ?, ?)`,
         [
-          saleData.user_id,
+          saleData.user_id || saleData.customerId,
           saleData.total_amount,
-          saleData.payment_method || 'credit_card'
+          saleData.payment_card || saleData.paymentCard || null,
+          saleData.expiry_date || saleData.expiryDate || null
         ]
       );
 
-      const saleId = saleResult.insertId;
+      const orderNo = orderResult.insertId;
 
-      // Create sale items
+      // Create order books (items)
       if (saleData.items && saleData.items.length > 0) {
         const itemValues = saleData.items.map(item => [
-          saleId,
-          item.book_isbn,
+          orderNo,
+          item.isbn || item.book_isbn,
           item.quantity,
-          item.unit_price
+          item.price_at_sale || item.unit_price || item.price
         ]);
 
         await connection.query(
-          'INSERT INTO SaleItems (sale_id, book_isbn, quantity, unit_price) VALUES ?',
+          'INSERT INTO order_books (OrderNo, ISBN, Quantity, PriceAtSale) VALUES ?',
           [itemValues]
         );
+
+        // Update book stock (TC-07: Update Book Quantity After Sale)
+        // This happens after payment validation, so stock is only deducted on successful checkout
+        for (const item of saleData.items) {
+          await connection.execute(
+            'UPDATE book SET StockQty = StockQty - ? WHERE ISBN = ?',
+            [item.quantity, item.isbn || item.book_isbn]
+          );
+        }
       }
 
       await connection.commit();
 
-      return this.findById(saleId);
+      return this.findById(orderNo);
     } catch (error) {
       await connection.rollback();
       throw error;
@@ -48,152 +58,219 @@ export const Sale = {
   },
 
   // Find sale by ID
-  async findById(saleId) {
+  async findById(orderNo) {
     const [rows] = await pool.execute(
-      `SELECT s.*, u.first_name, u.last_name, u.email, u.shipping_address
-       FROM Sales s
-       LEFT JOIN Users u ON s.user_id = u.user_id
-       WHERE s.sale_id = ?`,
-      [saleId]
+      `SELECT co.*, c.FirstName as first_name, c.LastName as last_name, 
+       c.Email as email, c.ShippingAddress as shipping_address
+       FROM customer_order co
+       LEFT JOIN customer c ON co.CustomerID = c.CustomerID
+       WHERE co.OrderNo = ?`,
+      [orderNo]
     );
 
     if (!rows[0]) return null;
 
-    const sale = rows[0];
+    const order = rows[0];
 
-    // Get sale items
+    // Get order items
     const [items] = await pool.execute(
-      `SELECT si.*, b.title as book_title, b.isbn as book_isbn
-       FROM SaleItems si
-       JOIN Books b ON si.book_isbn = b.isbn
-       WHERE si.sale_id = ?
-       ORDER BY si.sale_item_id`,
-      [saleId]
+      `SELECT ob.*, b.Title as book_title, b.ISBN as book_isbn
+       FROM order_books ob
+       JOIN book b ON ob.ISBN = b.ISBN
+       WHERE ob.OrderNo = ?
+       ORDER BY ob.ISBN`,
+      [orderNo]
     );
 
-    sale.items = items || [];
-    return sale;
+    order.items = items || [];
+    
+    // Map to frontend-expected format
+    return {
+      sale_id: order.OrderNo,
+      order_id: order.OrderNo,
+      user_id: order.CustomerID,
+      customer_id: order.CustomerID,
+      sale_date: order.OrderDate,
+      order_date: order.OrderDate,
+      total_amount: parseFloat(order.TotalAmount) || 0,
+      payment_method: order.PaymentCard ? 'credit_card' : 'other',
+      payment_card: order.PaymentCard,
+      expiry_date: order.ExpiryDate,
+      first_name: order.first_name,
+      last_name: order.last_name,
+      email: order.email,
+      shipping_address: order.shipping_address,
+      items: items.map(item => ({
+        sale_item_id: `${order.OrderNo}_${item.ISBN}`,
+        sale_id: order.OrderNo,
+        book_isbn: item.ISBN,
+        isbn: item.ISBN,
+        quantity: item.Quantity,
+        unit_price: parseFloat(item.PriceAtSale) || 0,
+        price: parseFloat(item.PriceAtSale) || 0,
+        book_title: item.book_title,
+        title: item.book_title
+      }))
+    };
   },
 
   // Get customer orders
   async findByUserId(userId) {
     const [rows] = await pool.execute(
-      `SELECT s.*, u.shipping_address
-       FROM Sales s
-       LEFT JOIN Users u ON s.user_id = u.user_id
-       WHERE s.user_id = ?
-       ORDER BY s.sale_date DESC`,
+      `SELECT co.*, c.ShippingAddress as shipping_address,
+       c.FirstName as first_name, c.LastName as last_name, c.Email as email
+       FROM customer_order co
+       LEFT JOIN customer c ON co.CustomerID = c.CustomerID
+       WHERE co.CustomerID = ?
+       ORDER BY co.OrderDate DESC`,
       [userId]
     );
 
-    // Get items for each sale
-    for (let sale of rows) {
+    // Get items for each order
+    for (let order of rows) {
       const [items] = await pool.execute(
-        `SELECT si.*, b.title as book_title, b.isbn as book_isbn
-         FROM SaleItems si
-         JOIN Books b ON si.book_isbn = b.isbn
-         WHERE si.sale_id = ?
-         ORDER BY si.sale_item_id`,
-        [sale.sale_id]
+        `SELECT ob.*, b.Title as book_title, b.ISBN as book_isbn
+         FROM order_books ob
+         JOIN book b ON ob.ISBN = b.ISBN
+         WHERE ob.OrderNo = ?
+         ORDER BY ob.ISBN`,
+        [order.OrderNo]
       );
-      sale.items = items || [];
+      
+      order.items = items.map(item => ({
+        sale_item_id: `${order.OrderNo}_${item.ISBN}`,
+        sale_id: order.OrderNo,
+        book_isbn: item.ISBN,
+        isbn: item.ISBN,
+        quantity: item.Quantity,
+        unit_price: parseFloat(item.PriceAtSale) || 0,
+        price: parseFloat(item.PriceAtSale) || 0,
+        book_title: item.book_title,
+        title: item.book_title
+      })) || [];
     }
 
-    return rows;
+    // Map to frontend-expected format
+    return rows.map(order => ({
+      sale_id: order.OrderNo,
+      order_id: order.OrderNo,
+      user_id: order.CustomerID,
+      customer_id: order.CustomerID,
+      sale_date: order.OrderDate,
+      order_date: order.OrderDate,
+      total_amount: parseFloat(order.TotalAmount) || 0,
+      payment_method: order.PaymentCard ? 'credit_card' : 'other',
+      payment_card: order.PaymentCard,
+      expiry_date: order.ExpiryDate,
+      first_name: order.first_name,
+      last_name: order.last_name,
+      email: order.email,
+      shipping_address: order.shipping_address,
+      items: order.items
+    }));
   },
 
   // Get monthly sales report
   async getMonthlySales() {
     const [rows] = await pool.execute(
-      `SELECT s.*, u.first_name, u.last_name,
-       CONCAT(u.first_name, ' ', u.last_name) as customer_name
-       FROM Sales s
-       LEFT JOIN Users u ON s.user_id = u.user_id
-       WHERE MONTH(s.sale_date) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))
-       AND YEAR(s.sale_date) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))
-       ORDER BY s.sale_date DESC`
+      `SELECT co.OrderNo as sale_id, co.OrderDate as sale_date, co.TotalAmount as total_amount,
+       c.FirstName as first_name, c.LastName as last_name,
+       CONCAT(c.FirstName, ' ', c.LastName) as customer_name
+       FROM customer_order co
+       LEFT JOIN customer c ON co.CustomerID = c.CustomerID
+       WHERE MONTH(co.OrderDate) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))
+       AND YEAR(co.OrderDate) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))
+       ORDER BY co.OrderDate DESC`
     );
 
     const [totalRow] = await pool.execute(
-      `SELECT SUM(total_amount) as total_sales, COUNT(*) as sales_count
-       FROM Sales
-       WHERE MONTH(sale_date) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))
-       AND YEAR(sale_date) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))`
+      `SELECT SUM(TotalAmount) as total_sales, COUNT(*) as sales_count
+       FROM customer_order
+       WHERE MONTH(OrderDate) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))
+       AND YEAR(OrderDate) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))`
     );
 
     return {
-      sales: rows,
-      total_sales: totalRow[0].total_sales || 0,
-      sales_count: totalRow[0].sales_count || 0
+      sales: rows.map(row => ({
+        sale_id: row.sale_id,
+        sale_date: row.sale_date,
+        total_amount: parseFloat(row.total_amount) || 0,
+        customer_name: row.customer_name || 'N/A'
+      })),
+      total_sales: parseFloat(totalRow[0].total_sales) || 0,
+      sales_count: parseInt(totalRow[0].sales_count) || 0
     };
   },
 
   // Get daily sales report
   async getDailySales(date) {
     const [rows] = await pool.execute(
-      `SELECT s.*, u.first_name, u.last_name,
-       CONCAT(u.first_name, ' ', u.last_name) as customer_name
-       FROM Sales s
-       LEFT JOIN Users u ON s.user_id = u.user_id
-       WHERE DATE(s.sale_date) = ?
-       ORDER BY s.sale_date DESC`,
+      `SELECT co.OrderNo as sale_id, co.OrderDate as sale_date, co.TotalAmount as total_amount,
+       c.FirstName as first_name, c.LastName as last_name,
+       CONCAT(c.FirstName, ' ', c.LastName) as customer_name
+       FROM customer_order co
+       LEFT JOIN customer c ON co.CustomerID = c.CustomerID
+       WHERE DATE(co.OrderDate) = ?
+       ORDER BY co.OrderDate DESC`,
       [date]
     );
 
     const [totalRow] = await pool.execute(
-      `SELECT SUM(total_amount) as total_sales, COUNT(*) as sales_count
-       FROM Sales
-       WHERE DATE(sale_date) = ?`,
+      `SELECT SUM(TotalAmount) as total_sales, COUNT(*) as sales_count
+       FROM customer_order
+       WHERE DATE(OrderDate) = ?`,
       [date]
     );
 
     return {
-      sales: rows,
-      total_sales: totalRow[0].total_sales || 0,
-      sales_count: totalRow[0].sales_count || 0
+      sales: rows.map(row => ({
+        sale_id: row.sale_id,
+        sale_date: row.sale_date,
+        total_amount: parseFloat(row.total_amount) || 0,
+        customer_name: row.customer_name || 'N/A'
+      })),
+      total_sales: parseFloat(totalRow[0].total_sales) || 0,
+      sales_count: parseInt(totalRow[0].sales_count) || 0
     };
   },
 
   // Get top customers (last 3 months)
   async getTopCustomers() {
     const [rows] = await pool.execute(
-      `SELECT u.user_id, u.first_name, u.last_name, u.email,
-       CONCAT(u.first_name, ' ', u.last_name) as name,
-       SUM(s.total_amount) as total_spent
-       FROM Users u
-       JOIN Sales s ON u.user_id = s.user_id
-       WHERE s.sale_date >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)
-       GROUP BY u.user_id, u.first_name, u.last_name, u.email
+      `SELECT c.CustomerID as user_id, c.FirstName as first_name, c.LastName as last_name, c.Email as email,
+       CONCAT(c.FirstName, ' ', c.LastName) as name,
+       SUM(co.TotalAmount) as total_spent
+       FROM customer c
+       JOIN customer_order co ON c.CustomerID = co.CustomerID
+       WHERE co.OrderDate >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)
+       GROUP BY c.CustomerID, c.FirstName, c.LastName, c.Email
        ORDER BY total_spent DESC
        LIMIT 5`
     );
-    return rows;
+    return rows.map(row => ({
+      ...row,
+      total_spent: parseFloat(row.total_spent) || 0
+    }));
   },
 
   // Get top selling books (last 3 months)
   async getTopBooks() {
     const [rows] = await pool.execute(
-      `SELECT b.isbn, b.title,
-       SUM(si.quantity) as copies_sold,
-       SUM(si.quantity * si.unit_price) as revenue
-       FROM Books b
-       JOIN SaleItems si ON b.isbn = si.book_isbn
-       JOIN Sales s ON si.sale_id = s.sale_id
-       WHERE s.sale_date >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)
-       GROUP BY b.isbn, b.title
+      `SELECT b.ISBN as isbn, b.Title as title,
+       SUM(ob.Quantity) as copies_sold,
+       SUM(ob.Quantity * ob.PriceAtSale) as revenue
+       FROM book b
+       JOIN order_books ob ON b.ISBN = ob.ISBN
+       JOIN customer_order co ON ob.OrderNo = co.OrderNo
+       WHERE co.OrderDate >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)
+       GROUP BY b.ISBN, b.Title
        ORDER BY copies_sold DESC
        LIMIT 10`
     );
-    return rows;
-  },
-
-  // Get replenishment count for a book
-  async getReplenishmentCount(bookISBN) {
-    const [rows] = await pool.execute(
-      'SELECT COUNT(*) as count FROM Orders WHERE book_isbn = ?',
-      [bookISBN]
-    );
-    return rows[0].count;
+    return rows.map(row => ({
+      ...row,
+      copies_sold: parseInt(row.copies_sold) || 0,
+      revenue: parseFloat(row.revenue) || 0
+    }));
   }
 };
-

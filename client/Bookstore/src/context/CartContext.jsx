@@ -36,12 +36,31 @@ export const CartProvider = ({ children }) => {
       setLoading(true);
       setError(null);
       const response = await getCart();
-      if (response.cartItems || response.items) {
-        setCartItems(response.cartItems || response.items || []);
+      
+      // Backend returns: { success: true, data: { cart: {...}, items: [...] } }
+      // cartService.getCart() returns response.data, so:
+      // response = { success: true, data: { cart: {...}, items: [...] } }
+      // response.data = { cart: {...}, items: [...] }
+      // response.data.items = [...]
+      
+      let itemsArray = [];
+      
+      if (response && response.data) {
+        // Standard backend response structure
+        itemsArray = Array.isArray(response.data.items) ? response.data.items : [];
+      } else if (Array.isArray(response.cartItems)) {
+        itemsArray = response.cartItems;
+      } else if (Array.isArray(response.items)) {
+        itemsArray = response.items;
+      } else if (Array.isArray(response)) {
+        itemsArray = response;
       }
+      
+      setCartItems(itemsArray);
     } catch (err) {
       console.error('Error loading cart:', err);
       // Don't set error for cart loading failures
+      setCartItems([]); // Ensure cartItems is always an array
     } finally {
       setLoading(false);
     }
@@ -76,7 +95,12 @@ export const CartProvider = ({ children }) => {
 
       // Try to add to server if authenticated
       try {
-        await addToCartService(book.isbn, quantity);
+        const response = await addToCartService(book.isbn, quantity);
+        // Backend returns: { success: true, data: { cart: {...}, items: [...] } }
+        if (response && response.data && Array.isArray(response.data.items)) {
+          setCartItems(response.data.items);
+          return { success: true };
+        }
       } catch (err) {
         // If not authenticated, just use local storage
         console.log('Using local cart storage');
@@ -101,7 +125,12 @@ export const CartProvider = ({ children }) => {
       
       // Try to update on server
       try {
-        await updateCartItem(itemId, quantity);
+        const response = await updateCartItem(itemId, quantity);
+        // Backend returns: { success: true, data: { cart: {...}, items: [...] } }
+        if (response && response.data && Array.isArray(response.data.items)) {
+          setCartItems(response.data.items);
+          return { success: true };
+        }
       } catch (err) {
         console.log('Using local cart storage');
       }
@@ -127,11 +156,17 @@ export const CartProvider = ({ children }) => {
       
       // Try to remove from server
       try {
-        await removeFromCartService(itemId);
+        const response = await removeFromCartService(itemId);
+        // Backend returns: { success: true, data: { cart: {...}, items: [...] } }
+        if (response && response.data && Array.isArray(response.data.items)) {
+          setCartItems(response.data.items);
+          return { success: true };
+        }
       } catch (err) {
         console.log('Using local cart storage');
       }
 
+      // If server response has items, use them; otherwise update local state
       setCartItems(prev => prev.filter(item => 
         item.cart_item_id !== itemId && item.id !== itemId
       ));
@@ -149,7 +184,12 @@ export const CartProvider = ({ children }) => {
       
       // Try to clear on server
       try {
-        await clearCartService();
+        const response = await clearCartService();
+        // Backend returns: { success: true, data: { cart: {...}, items: [] } }
+        if (response && response.data) {
+          setCartItems(response.data.items || []);
+          return { success: true };
+        }
       } catch (err) {
         console.log('Using local cart storage');
       }

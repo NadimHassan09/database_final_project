@@ -95,6 +95,21 @@ export const updateBook = async (req, res, next) => {
 export const deleteBook = async (req, res, next) => {
   try {
     const { isbn } = req.params;
+    
+    // Check if book has existing orders (TC-30)
+    const pool = (await import('../config/database.js')).default;
+    const [orderRows] = await pool.execute(
+      'SELECT COUNT(*) as count FROM order_books WHERE ISBN = ?',
+      [isbn]
+    );
+    
+    if (orderRows[0].count > 0) {
+      return res.status(409).json({
+        success: false,
+        message: 'Cannot delete book: Book has existing orders. Please handle referential integrity first.'
+      });
+    }
+    
     const deleted = await Book.delete(isbn);
 
     if (!deleted) {

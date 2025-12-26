@@ -1,4 +1,4 @@
-// Cart Controller
+// Cart Controller - Updated for new database structure
 import { Cart } from '../models/Cart.js';
 import { Book } from '../models/Book.js';
 
@@ -49,6 +49,7 @@ export const addToCart = async (req, res, next) => {
 
 export const updateCartItem = async (req, res, next) => {
   try {
+    // In new structure, itemId is "cartId_isbn" format
     const { itemId } = req.params;
     const { quantity } = req.body;
 
@@ -59,7 +60,19 @@ export const updateCartItem = async (req, res, next) => {
       });
     }
 
-    const cartData = await Cart.updateItemQuantity(parseInt(itemId), quantity);
+    // Parse itemId (format: "cartId_isbn")
+    const parts = itemId.split('_');
+    if (parts.length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid item ID format'
+      });
+    }
+
+    const cartId = parseInt(parts[0]);
+    const isbn = parts.slice(1).join('_'); // In case ISBN contains underscores
+
+    const cartData = await Cart.updateItemQuantity(cartId, isbn, quantity);
 
     if (!cartData) {
       return res.status(404).json({
@@ -80,8 +93,22 @@ export const updateCartItem = async (req, res, next) => {
 
 export const removeFromCart = async (req, res, next) => {
   try {
+    // In new structure, itemId is "cartId_isbn" format
     const { itemId } = req.params;
-    const cartData = await Cart.removeItem(parseInt(itemId));
+    
+    // Parse itemId (format: "cartId_isbn")
+    const parts = itemId.split('_');
+    if (parts.length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid item ID format'
+      });
+    }
+
+    const cartId = parseInt(parts[0]);
+    const isbn = parts.slice(1).join('_'); // In case ISBN contains underscores
+
+    const cartData = await Cart.removeItem(cartId, isbn);
 
     if (!cartData) {
       return res.status(404).json({
@@ -113,4 +140,3 @@ export const clearCart = async (req, res, next) => {
     next(error);
   }
 };
-

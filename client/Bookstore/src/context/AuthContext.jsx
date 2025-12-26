@@ -41,18 +41,38 @@ export const AuthProvider = ({ children }) => {
       // Backend returns: { success: true, message: "...", data: { user: {...}, token: "..." } }
       // After axios, response.data is: { success: true, message: "...", data: { user: {...}, token: "..." } }
       const responseData = response.data || response;
+      
+      // Debug logging
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Login response:', responseData);
+      }
+      
       const token = responseData.data?.token || responseData.token;
       const user = responseData.data?.user || responseData.user;
       
-      if (token && user) {
-        localStorage.setItem('token', token);
-        localStorage.setItem('user', JSON.stringify(user));
-        setUser(user);
-        return { success: true };
+      if (!token || !user) {
+        console.error('Missing token or user in response:', { token: !!token, user: !!user, responseData });
+        throw new Error('Invalid response from server: missing token or user data');
       }
-      throw new Error('Invalid response from server');
+      
+      // Ensure user has required fields
+      if (!user.user_id || !user.username || !user.user_type) {
+        console.error('User object missing required fields:', user);
+        throw new Error('Invalid user data received from server');
+      }
+      
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+      setUser(user);
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Login successful, user stored:', { username: user.username, user_type: user.user_type });
+      }
+      
+      return { success: true };
     } catch (err) {
       const errorMessage = err.response?.data?.message || err.message || 'Login failed';
+      console.error('Login error:', errorMessage, err);
       setError(errorMessage);
       return { success: false, error: errorMessage };
     } finally {
@@ -96,6 +116,7 @@ export const AuthProvider = ({ children }) => {
     } finally {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+      localStorage.removeItem('cart'); // Clear cart on logout (TC-22)
       setUser(null);
       setError(null);
     }

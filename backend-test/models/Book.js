@@ -1,4 +1,4 @@
-// Book Model
+// Book Model - New Database Structure
 import pool from '../config/database.js';
 
 export const Book = {
@@ -7,14 +7,13 @@ export const Book = {
     const offset = (page - 1) * limit;
     
     const [rows] = await pool.execute(
-      `SELECT b.*, p.name as publisher_name,
-       GROUP_CONCAT(DISTINCT CONCAT(a.author_id, ':', a.name) ORDER BY a.name SEPARATOR '||') as authors_data
-       FROM Books b
-       LEFT JOIN Publishers p ON b.publisher_id = p.publisher_id
-       LEFT JOIN Book_Author ba ON b.isbn = ba.book_isbn
-       LEFT JOIN Authors a ON ba.author_id = a.author_id
-       GROUP BY b.isbn
-       ORDER BY b.created_at DESC
+      `SELECT b.*, p.Name as publisher_name,
+       GROUP_CONCAT(DISTINCT a.AuthorName ORDER BY a.AuthorName SEPARATOR '||') as authors_data
+       FROM book b
+       LEFT JOIN publisher p ON b.PublisherID = p.PublisherID
+       LEFT JOIN author a ON b.ISBN = a.ISBN
+       GROUP BY b.ISBN
+       ORDER BY b.ISBN DESC
        LIMIT ? OFFSET ?`,
       [limit, offset]
     );
@@ -22,21 +21,32 @@ export const Book = {
     // Parse authors into array format
     const books = rows.map(book => {
       if (book.authors_data) {
-        book.authors = book.authors_data.split('||').map(authorStr => {
-          const [id, name] = authorStr.split(':');
-          return { author_id: parseInt(id), name };
-        });
-        // Also keep as string for backward compatibility
+        book.authors = book.authors_data.split('||').map(name => ({ name }));
         book.authors_string = book.authors.map(a => a.name).join(', ');
       } else {
         book.authors = [];
         book.authors_string = '';
       }
       delete book.authors_data;
-      return book;
+      
+      // Map to frontend-expected format
+      return {
+        isbn: book.ISBN,
+        title: book.Title,
+        publication_year: book.PublicationYear,
+        price: parseFloat(book.Price) || 0,
+        category: book.Category,
+        stock_qty: book.StockQty, // New database field name
+        quantity_in_stock: book.StockQty, // Backward compatibility
+        min_threshold: book.ThresholdQty,
+        publisher_id: book.PublisherID,
+        publisher_name: book.publisher_name,
+        authors: book.authors,
+        authors_string: book.authors_string
+      };
     });
 
-    const [countRows] = await pool.execute('SELECT COUNT(*) as total FROM Books');
+    const [countRows] = await pool.execute('SELECT COUNT(*) as total FROM book');
     const total = parseInt(countRows[0].total);
 
     return {
@@ -50,14 +60,13 @@ export const Book = {
   // Find book by ISBN
   async findByISBN(isbn) {
     const [rows] = await pool.execute(
-      `SELECT b.*, p.name as publisher_name, p.publisher_id,
-       GROUP_CONCAT(DISTINCT CONCAT(a.author_id, ':', a.name) SEPARATOR '||') as authors_data
-       FROM Books b
-       LEFT JOIN Publishers p ON b.publisher_id = p.publisher_id
-       LEFT JOIN Book_Author ba ON b.isbn = ba.book_isbn
-       LEFT JOIN Authors a ON ba.author_id = a.author_id
-       WHERE b.isbn = ?
-       GROUP BY b.isbn`,
+      `SELECT b.*, p.Name as publisher_name, p.PublisherID,
+       GROUP_CONCAT(DISTINCT a.AuthorName SEPARATOR '||') as authors_data
+       FROM book b
+       LEFT JOIN publisher p ON b.PublisherID = p.PublisherID
+       LEFT JOIN author a ON b.ISBN = a.ISBN
+       WHERE b.ISBN = ?
+       GROUP BY b.ISBN`,
       [isbn]
     );
 
@@ -66,70 +75,89 @@ export const Book = {
     const book = rows[0];
     // Parse authors
     if (book.authors_data) {
-      book.authors = book.authors_data.split('||').map(authorStr => {
-        const [id, name] = authorStr.split(':');
-        return { author_id: parseInt(id), name };
-      });
+      book.authors = book.authors_data.split('||').map(name => ({ name }));
+      book.authors_string = book.authors.map(a => a.name).join(', ');
     } else {
       book.authors = [];
+      book.authors_string = '';
     }
     delete book.authors_data;
 
-    return book;
+    // Map to frontend-expected format
+    return {
+      isbn: book.ISBN,
+      title: book.Title,
+      publication_year: book.PublicationYear,
+      price: parseFloat(book.Price) || 0,
+      category: book.Category,
+      stock_qty: book.StockQty, // New database field name
+      quantity_in_stock: book.StockQty, // Backward compatibility
+      min_threshold: book.ThresholdQty,
+      publisher_id: book.PublisherID,
+      publisher_name: book.publisher_name,
+      authors: book.authors,
+      authors_string: book.authors_string
+    };
   },
 
   // Search books
   async search(query, filters = {}) {
     let sql = `
-      SELECT DISTINCT b.*, p.name as publisher_name,
-      GROUP_CONCAT(DISTINCT CONCAT(a.author_id, ':', a.name) ORDER BY a.name SEPARATOR '||') as authors_data
-      FROM Books b
-      LEFT JOIN Publishers p ON b.publisher_id = p.publisher_id
-      LEFT JOIN Book_Author ba ON b.isbn = ba.book_isbn
-      LEFT JOIN Authors a ON ba.author_id = a.author_id
+      SELECT DISTINCT b.*, p.Name as publisher_name,
+      GROUP_CONCAT(DISTINCT a.AuthorName ORDER BY a.AuthorName SEPARATOR '||') as authors_data
+      FROM book b
+      LEFT JOIN publisher p ON b.PublisherID = p.PublisherID
+      LEFT JOIN author a ON b.ISBN = a.ISBN
       WHERE 1=1
     `;
     const values = [];
 
     if (query) {
-      sql += ` AND (b.title LIKE ? OR b.isbn LIKE ? OR a.name LIKE ?)`;
+      sql += ` AND (b.Title LIKE ? OR b.ISBN LIKE ? OR a.AuthorName LIKE ?)`;
       const searchTerm = `%${query}%`;
       values.push(searchTerm, searchTerm, searchTerm);
     }
 
     if (filters.category) {
-      // Category filtering would need a category field or table
-      // For now, skip if not in schema
-    }
-
-    if (filters.authorId) {
-      sql += ` AND a.author_id = ?`;
-      values.push(filters.authorId);
+      sql += ` AND b.Category = ?`;
+      values.push(filters.category);
     }
 
     if (filters.publisherId) {
-      sql += ` AND b.publisher_id = ?`;
+      sql += ` AND b.PublisherID = ?`;
       values.push(filters.publisherId);
     }
 
-    sql += ` GROUP BY b.isbn ORDER BY b.title`;
+    sql += ` GROUP BY b.ISBN ORDER BY b.Title`;
 
     const [rows] = await pool.execute(sql, values);
     
     // Parse authors into array format
     return rows.map(book => {
       if (book.authors_data) {
-        book.authors = book.authors_data.split('||').map(authorStr => {
-          const [id, name] = authorStr.split(':');
-          return { author_id: parseInt(id), name };
-        });
+        book.authors = book.authors_data.split('||').map(name => ({ name }));
         book.authors_string = book.authors.map(a => a.name).join(', ');
       } else {
         book.authors = [];
         book.authors_string = '';
       }
       delete book.authors_data;
-      return book;
+      
+      // Map to frontend-expected format
+      return {
+        isbn: book.ISBN,
+        title: book.Title,
+        publication_year: book.PublicationYear,
+        price: parseFloat(book.Price) || 0,
+        category: book.Category,
+        stock_qty: book.StockQty, // New database field name
+        quantity_in_stock: book.StockQty, // Backward compatibility
+        min_threshold: book.ThresholdQty,
+        publisher_id: book.PublisherID,
+        publisher_name: book.publisher_name,
+        authors: book.authors,
+        authors_string: book.authors_string
+      };
     });
   },
 
@@ -141,24 +169,25 @@ export const Book = {
 
       // Insert book
       await connection.execute(
-        `INSERT INTO Books (isbn, title, price, publication_year, quantity_in_stock, min_threshold, publisher_id)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO book (ISBN, Title, PublicationYear, Price, Category, StockQty, ThresholdQty, PublisherID)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           bookData.isbn,
           bookData.title,
-          bookData.price,
           bookData.publication_year || null,
-          bookData.quantity_in_stock || 0,
-          bookData.min_threshold || 10,
-          bookData.publisher_id
+          bookData.price,
+          bookData.category || null,
+          bookData.quantity_in_stock || bookData.stockQty || 0,
+          bookData.min_threshold || bookData.thresholdQty || 10,
+          bookData.publisher_id || bookData.publisherId
         ]
       );
 
       // Insert book-author relationships
-      if (bookData.author_ids && bookData.author_ids.length > 0) {
-        const authorValues = bookData.author_ids.map(authorId => [bookData.isbn, authorId]);
+      if (bookData.authors && Array.isArray(bookData.authors)) {
+        const authorValues = bookData.authors.map(authorName => [bookData.isbn, authorName]);
         await connection.query(
-          'INSERT INTO Book_Author (book_isbn, author_id) VALUES ?',
+          'INSERT INTO author (ISBN, AuthorName) VALUES ?',
           [authorValues]
         );
       }
@@ -183,51 +212,55 @@ export const Book = {
       const values = [];
 
       if (bookData.title) {
-        updates.push('title = ?');
+        updates.push('Title = ?');
         values.push(bookData.title);
       }
-      if (bookData.price) {
-        updates.push('price = ?');
+      if (bookData.price !== undefined) {
+        updates.push('Price = ?');
         values.push(bookData.price);
       }
-      if (bookData.publication_year) {
-        updates.push('publication_year = ?');
+      if (bookData.publication_year !== undefined) {
+        updates.push('PublicationYear = ?');
         values.push(bookData.publication_year);
       }
-      if (bookData.quantity_in_stock !== undefined) {
-        updates.push('quantity_in_stock = ?');
-        values.push(bookData.quantity_in_stock);
+      if (bookData.category) {
+        updates.push('Category = ?');
+        values.push(bookData.category);
       }
-      if (bookData.min_threshold !== undefined) {
-        updates.push('min_threshold = ?');
-        values.push(bookData.min_threshold);
+      if (bookData.quantity_in_stock !== undefined || bookData.stockQty !== undefined) {
+        updates.push('StockQty = ?');
+        values.push(bookData.quantity_in_stock || bookData.stockQty);
       }
-      if (bookData.publisher_id) {
-        updates.push('publisher_id = ?');
-        values.push(bookData.publisher_id);
+      if (bookData.min_threshold !== undefined || bookData.thresholdQty !== undefined) {
+        updates.push('ThresholdQty = ?');
+        values.push(bookData.min_threshold || bookData.thresholdQty);
+      }
+      if (bookData.publisher_id || bookData.publisherId) {
+        updates.push('PublisherID = ?');
+        values.push(bookData.publisher_id || bookData.publisherId);
       }
 
       if (updates.length > 0) {
         values.push(isbn);
         await connection.execute(
-          `UPDATE Books SET ${updates.join(', ')} WHERE isbn = ?`,
+          `UPDATE book SET ${updates.join(', ')} WHERE ISBN = ?`,
           values
         );
       }
 
       // Update authors if provided
-      if (bookData.author_ids && Array.isArray(bookData.author_ids)) {
+      if (bookData.authors && Array.isArray(bookData.authors)) {
         // Delete existing relationships
         await connection.execute(
-          'DELETE FROM Book_Author WHERE book_isbn = ?',
+          'DELETE FROM author WHERE ISBN = ?',
           [isbn]
         );
 
         // Insert new relationships
-        if (bookData.author_ids.length > 0) {
-          const authorValues = bookData.author_ids.map(authorId => [isbn, authorId]);
+        if (bookData.authors.length > 0) {
+          const authorValues = bookData.authors.map(authorName => [isbn, authorName]);
           await connection.query(
-            'INSERT INTO Book_Author (book_isbn, author_id) VALUES ?',
+            'INSERT INTO author (ISBN, AuthorName) VALUES ?',
             [authorValues]
           );
         }
@@ -246,10 +279,9 @@ export const Book = {
   // Delete book
   async delete(isbn) {
     const [result] = await pool.execute(
-      'DELETE FROM Books WHERE isbn = ?',
+      'DELETE FROM book WHERE ISBN = ?',
       [isbn]
     );
     return result.affectedRows > 0;
   }
 };
-

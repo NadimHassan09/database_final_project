@@ -1,21 +1,21 @@
-// Cart Model
+// Cart Model - New Database Structure
 import pool from '../config/database.js';
 
 export const Cart = {
   // Get or create cart for user
   async getOrCreateCart(userId) {
     let [rows] = await pool.execute(
-      'SELECT * FROM Cart WHERE user_id = ?',
+      'SELECT CartID as cart_id, CustomerID as user_id, CreatedDate as created_at FROM shopping_cart WHERE CustomerID = ?',
       [userId]
     );
 
     if (rows.length === 0) {
       const [result] = await pool.execute(
-        'INSERT INTO Cart (user_id) VALUES (?)',
+        'INSERT INTO shopping_cart (CustomerID) VALUES (?)',
         [userId]
       );
       [rows] = await pool.execute(
-        'SELECT * FROM Cart WHERE cart_id = ?',
+        'SELECT CartID as cart_id, CustomerID as user_id, CreatedDate as created_at FROM shopping_cart WHERE CartID = ?',
         [result.insertId]
       );
     }
@@ -28,23 +28,31 @@ export const Cart = {
     const cart = await this.getOrCreateCart(userId);
     
     const [items] = await pool.execute(
-      `SELECT ci.*, b.title, b.price, b.quantity_in_stock,
-       GROUP_CONCAT(DISTINCT a.name ORDER BY a.name SEPARATOR ', ') as authors
-       FROM CartItems ci
-       JOIN Books b ON ci.book_isbn = b.isbn
-       LEFT JOIN Book_Author ba ON b.isbn = ba.book_isbn
-       LEFT JOIN Authors a ON ba.author_id = a.author_id
-       WHERE ci.cart_id = ?
-       GROUP BY ci.cart_item_id`,
+      `SELECT ic.CartID as cart_id, ic.ISBN as book_isbn, ic.Quantity as quantity,
+       b.Title as title, b.Price as price, b.StockQty as quantity_in_stock,
+       GROUP_CONCAT(DISTINCT a.AuthorName ORDER BY a.AuthorName SEPARATOR ', ') as authors
+       FROM items_cart ic
+       JOIN book b ON ic.ISBN = b.ISBN
+       LEFT JOIN author a ON b.ISBN = a.ISBN
+       WHERE ic.CartID = ?
+       GROUP BY ic.CartID, ic.ISBN, ic.Quantity, b.Title, b.Price, b.StockQty`,
       [cart.cart_id]
     );
 
     return {
       cart,
       items: items.map(item => ({
-        ...item,
-        unit_price: item.price,
-        max_stock: item.quantity_in_stock
+        cart_item_id: `${item.cart_id}_${item.book_isbn}`, // Composite key
+        cart_id: item.cart_id,
+        book_isbn: item.book_isbn,
+        quantity: item.quantity,
+        title: item.title,
+        price: parseFloat(item.price) || 0,
+        unit_price: parseFloat(item.price) || 0,
+        quantity_in_stock: item.quantity_in_stock,
+        max_stock: item.quantity_in_stock,
+        authors: item.authors || '',
+        authors_string: item.authors || ''
       }))
     };
   },
@@ -55,20 +63,20 @@ export const Cart = {
 
     // Check if item already exists
     const [existing] = await pool.execute(
-      'SELECT * FROM CartItems WHERE cart_id = ? AND book_isbn = ?',
+      'SELECT * FROM items_cart WHERE CartID = ? AND ISBN = ?',
       [cart.cart_id, bookISBN]
     );
 
     if (existing.length > 0) {
       // Update quantity
       await pool.execute(
-        'UPDATE CartItems SET quantity = quantity + ? WHERE cart_item_id = ?',
-        [quantity, existing[0].cart_item_id]
+        'UPDATE items_cart SET Quantity = Quantity + ? WHERE CartID = ? AND ISBN = ?',
+        [quantity, cart.cart_id, bookISBN]
       );
     } else {
       // Insert new item
       await pool.execute(
-        'INSERT INTO CartItems (cart_id, book_isbn, quantity) VALUES (?, ?, ?)',
+        'INSERT INTO items_cart (CartID, ISBN, Quantity) VALUES (?, ?, ?)',
         [cart.cart_id, bookISBN, quantity]
       );
     }
@@ -77,27 +85,23 @@ export const Cart = {
   },
 
   // Update cart item quantity
-  async updateItemQuantity(cartItemId, quantity) {
+  async updateItemQuantity(cartId, bookISBN, quantity) {
     if (quantity <= 0) {
-      await pool.execute('DELETE FROM CartItems WHERE cart_item_id = ?', [cartItemId]);
+      await pool.execute('DELETE FROM items_cart WHERE CartID = ? AND ISBN = ?', [cartId, bookISBN]);
       return null;
     }
 
     await pool.execute(
-      'UPDATE CartItems SET quantity = ? WHERE cart_item_id = ?',
-      [quantity, cartItemId]
+      'UPDATE items_cart SET Quantity = ? WHERE CartID = ? AND ISBN = ?',
+      [quantity, cartId, bookISBN]
     );
 
-    const [rows] = await pool.execute(
-      'SELECT cart_id FROM CartItems WHERE cart_item_id = ?',
-      [cartItemId]
+    const [userRows] = await pool.execute(
+      'SELECT CustomerID as user_id FROM shopping_cart WHERE CartID = ?',
+      [cartId]
     );
 
-    if (rows.length > 0) {
-      const [userRows] = await pool.execute(
-        'SELECT user_id FROM Cart WHERE cart_id = ?',
-        [rows[0].cart_id]
-      );
+    if (userRows.length > 0) {
       return this.getCartWithItems(userRows[0].user_id);
     }
 
@@ -105,29 +109,25 @@ export const Cart = {
   },
 
   // Remove item from cart
-  async removeItem(cartItemId) {
-    const [itemRows] = await pool.execute(
-      'SELECT cart_id FROM CartItems WHERE cart_item_id = ?',
-      [cartItemId]
-    );
-
-    if (itemRows.length === 0) return null;
-
-    await pool.execute('DELETE FROM CartItems WHERE cart_item_id = ?', [cartItemId]);
+  async removeItem(cartId, bookISBN) {
+    await pool.execute('DELETE FROM items_cart WHERE CartID = ? AND ISBN = ?', [cartId, bookISBN]);
 
     const [userRows] = await pool.execute(
-      'SELECT user_id FROM Cart WHERE cart_id = ?',
-      [itemRows[0].cart_id]
+      'SELECT CustomerID as user_id FROM shopping_cart WHERE CartID = ?',
+      [cartId]
     );
 
-    return this.getCartWithItems(userRows[0].user_id);
+    if (userRows.length > 0) {
+      return this.getCartWithItems(userRows[0].user_id);
+    }
+
+    return null;
   },
 
   // Clear cart
   async clearCart(userId) {
     const cart = await this.getOrCreateCart(userId);
-    await pool.execute('DELETE FROM CartItems WHERE cart_id = ?', [cart.cart_id]);
+    await pool.execute('DELETE FROM items_cart WHERE CartID = ?', [cart.cart_id]);
     return { cart, items: [] };
   }
 };
-

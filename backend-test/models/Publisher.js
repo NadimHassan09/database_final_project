@@ -1,11 +1,11 @@
-// Publisher Model
+// Publisher Model - New Database Structure
 import pool from '../config/database.js';
 
 export const Publisher = {
   // Get all publishers
   async findAll() {
     const [rows] = await pool.execute(
-      'SELECT * FROM Publishers ORDER BY name'
+      'SELECT PublisherID as publisher_id, Name as name, Address as address, Phone as phone_number FROM publisher ORDER BY Name'
     );
     return rows;
   },
@@ -13,7 +13,7 @@ export const Publisher = {
   // Find publisher by ID
   async findById(publisherId) {
     const [rows] = await pool.execute(
-      'SELECT * FROM Publishers WHERE publisher_id = ?',
+      'SELECT PublisherID as publisher_id, Name as name, Address as address, Phone as phone_number FROM publisher WHERE PublisherID = ?',
       [publisherId]
     );
     return rows[0] || null;
@@ -22,8 +22,8 @@ export const Publisher = {
   // Create publisher
   async create(publisherData) {
     const [result] = await pool.execute(
-      'INSERT INTO Publishers (name, address, phone_number) VALUES (?, ?, ?)',
-      [publisherData.name, publisherData.address || null, publisherData.phone_number || null]
+      'INSERT INTO publisher (Name, Address, Phone) VALUES (?, ?, ?)',
+      [publisherData.name, publisherData.address || null, publisherData.phone_number || publisherData.phone || null]
     );
     return this.findById(result.insertId);
   },
@@ -34,16 +34,16 @@ export const Publisher = {
     const values = [];
 
     if (publisherData.name) {
-      updates.push('name = ?');
+      updates.push('Name = ?');
       values.push(publisherData.name);
     }
     if (publisherData.address !== undefined) {
-      updates.push('address = ?');
+      updates.push('Address = ?');
       values.push(publisherData.address);
     }
-    if (publisherData.phone_number !== undefined) {
-      updates.push('phone_number = ?');
-      values.push(publisherData.phone_number);
+    if (publisherData.phone_number !== undefined || publisherData.phone !== undefined) {
+      updates.push('Phone = ?');
+      values.push(publisherData.phone_number || publisherData.phone);
     }
 
     if (updates.length === 0) {
@@ -52,11 +52,10 @@ export const Publisher = {
 
     values.push(publisherId);
     await pool.execute(
-      `UPDATE Publishers SET ${updates.join(', ')} WHERE publisher_id = ?`,
+      `UPDATE publisher SET ${updates.join(', ')} WHERE PublisherID = ?`,
       values
     );
 
     return this.findById(publisherId);
   }
 };
-
