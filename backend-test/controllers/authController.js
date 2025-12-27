@@ -3,6 +3,7 @@ import { User } from '../models/User.js';
 import jwt from 'jsonwebtoken';
 import { config } from '../config/environment.js';
 import { validateRegister, validateLogin } from '../middleware/validationMiddleware.js';
+import pool from '../config/database.js';
 
 export const register = async (req, res, next) => {
   try {
@@ -203,6 +204,77 @@ export const updateProfile = async (req, res, next) => {
     res.json({
       success: true,
       message: 'Profile updated successfully',
+      data: { user: updatedUser }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const changePassword = async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current password and new password are required'
+      });
+    }
+
+    // Get the current user to verify the current password
+    const user = await User.findById(req.user.user_id, req.user.user_type);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Get the actual password from the database
+    let actualPassword = null;
+    if (req.user.user_type === 'admin') {
+      const [adminRows] = await pool.execute(
+        'SELECT Password FROM admin WHERE AdminID = ?',
+        [req.user.user_id]
+      );
+      if (adminRows[0]) {
+        actualPassword = adminRows[0].Password;
+      }
+    } else {
+      const [customerRows] = await pool.execute(
+        'SELECT Password FROM customer WHERE CustomerID = ?',
+        [req.user.user_id]
+      );
+      if (customerRows[0]) {
+        actualPassword = customerRows[0].Password;
+      }
+    }
+
+    if (!actualPassword) {
+      return res.status(500).json({
+        success: false,
+        message: 'Unable to retrieve user password'
+      });
+    }
+
+    // Verify current password
+    const isValidPassword = await User.verifyPassword(currentPassword, actualPassword);
+    if (!isValidPassword) {
+      return res.status(401).json({
+        success: false,
+        message: 'Current password is incorrect'
+      });
+    }
+
+    // Update password
+    const updatedUser = await User.update(req.user.user_id, req.user.user_type, {
+      password: newPassword
+    });
+
+    res.json({
+      success: true,
+      message: 'Password changed successfully',
       data: { user: updatedUser }
     });
   } catch (error) {

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Container, Card, Button, Badge, Alert, Form } from 'react-bootstrap';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getBookByISBN } from '../../services/bookService';
-import { formatPrice, formatISBN } from '../../utils/formatters';
+import { formatPrice } from '../../utils/formatters';
 import { getStockStatus, formatAuthors } from '../../utils/helpers';
 import { validateQuantity } from '../../utils/validators';
 import { useCart } from '../../context/CartContext';
@@ -216,7 +216,7 @@ const BookDetails = () => {
 
               <div className="mb-3">
                 <Badge bg={stockStatus.color} className="me-2">{stockStatus.text}</Badge>
-                <span className="text-muted">ISBN: {formatISBN(book.isbn)}</span>
+                <span className="text-muted">ISBN: {book.isbn}</span>
               </div>
 
               <div className="mb-3">

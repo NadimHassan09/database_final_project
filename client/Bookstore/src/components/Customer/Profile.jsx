@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Container, Row, Col, Card, Form, Button, Alert } from 'react-bootstrap';
+import { useState, useEffect } from 'react';
+import { Container, Row, Col, Card, Form, Button, Alert, Modal } from 'react-bootstrap';
 import { useAuth } from '../../context/AuthContext';
 import { updateProfile, changePassword } from '../../services/authService';
 import { validateEmail, validatePhone, validatePassword, validateRequired } from '../../utils/validators';
@@ -17,6 +17,19 @@ const Profile = () => {
     shippingAddress: user?.shipping_address || '',
   });
 
+  // Update profile data when user changes
+  useEffect(() => {
+    if (user) {
+      setProfileData({
+        firstName: user.first_name || '',
+        lastName: user.last_name || '',
+        email: user.email || '',
+        phone: user.phone || '',
+        shippingAddress: user.shipping_address || '',
+      });
+    }
+  }, [user]);
+
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
@@ -27,6 +40,8 @@ const Profile = () => {
   const [passwordErrors, setPasswordErrors] = useState({});
   const [saving, setSaving] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   const handleProfileChange = (e) => {
     const { name, value } = e.target;
@@ -96,6 +111,12 @@ const Profile = () => {
       return;
     }
 
+    // Show confirmation modal
+    setShowProfileModal(true);
+  };
+
+  const confirmProfileUpdate = async () => {
+    setShowProfileModal(false);
     setSaving(true);
 
     try {
@@ -108,7 +129,9 @@ const Profile = () => {
       };
 
       const response = await updateProfile(userData);
-      const updatedUser = { ...user, ...response.user, ...userData };
+      // Response structure: { success: true, data: { user: {...} } }
+      const updatedUserData = response.data?.user || response.user || {};
+      const updatedUser = { ...user, ...updatedUserData, ...userData };
       updateUser(updatedUser);
       showSuccess('Profile updated successfully!');
     } catch (err) {
@@ -125,6 +148,12 @@ const Profile = () => {
       return;
     }
 
+    // Show confirmation modal
+    setShowPasswordModal(true);
+  };
+
+  const confirmPasswordChange = async () => {
+    setShowPasswordModal(false);
     setChangingPassword(true);
 
     try {
@@ -295,6 +324,77 @@ const Profile = () => {
           </Card>
         </Col>
       </Row>
+
+      {/* Profile Update Confirmation Modal */}
+      <Modal show={showProfileModal} onHide={() => setShowProfileModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Confirm Profile Update</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p>Are you sure you want to update your profile information?</p>
+          {(() => {
+            const changes = [];
+            if (profileData.firstName !== (user?.first_name || '')) {
+              changes.push({ field: 'First Name', old: user?.first_name || 'N/A', new: profileData.firstName });
+            }
+            if (profileData.lastName !== (user?.last_name || '')) {
+              changes.push({ field: 'Last Name', old: user?.last_name || 'N/A', new: profileData.lastName });
+            }
+            if (profileData.email !== (user?.email || '')) {
+              changes.push({ field: 'Email', old: user?.email || 'N/A', new: profileData.email });
+            }
+            if (profileData.phone !== (user?.phone || '')) {
+              changes.push({ field: 'Phone', old: user?.phone || 'N/A', new: profileData.phone || 'N/A' });
+            }
+            if (profileData.shippingAddress !== (user?.shipping_address || '')) {
+              changes.push({ field: 'Shipping Address', old: user?.shipping_address || 'N/A', new: profileData.shippingAddress || 'N/A' });
+            }
+            
+            return changes.length > 0 ? (
+              <div className="mt-3">
+                <strong>Changes:</strong>
+                <ul className="mt-2">
+                  {changes.map((change, index) => (
+                    <li key={index}>
+                      <strong>{change.field}:</strong> {change.old} → {change.new}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <Alert variant="info" className="mt-3">
+                No changes detected. All fields match your current profile.
+              </Alert>
+            );
+          })()}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowProfileModal(false)}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={confirmProfileUpdate} disabled={saving}>
+            {saving ? 'Saving...' : 'Confirm Changes'}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Password Change Confirmation Modal */}
+      <Modal show={showPasswordModal} onHide={() => setShowPasswordModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Confirm Password Change</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p>Are you sure you want to change your password?</p>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowPasswordModal(false)}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={confirmPasswordChange} disabled={changingPassword}>
+            {changingPassword ? 'Changing...' : 'Confirm Change'}
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </Container>
   );
 };

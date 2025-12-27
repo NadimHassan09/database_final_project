@@ -89,7 +89,18 @@ const Checkout = () => {
       const response = await checkout(checkoutData);
       await clearCart();
       showSuccess('Order placed successfully!');
-      navigate(`/customer/orders/${response.order_id || response.orderId}`);
+      
+      // Extract order_id from nested response structure
+      // Backend returns: { success: true, data: { sale: {...}, order_id: ... } }
+      // Service returns: response.data, so response = { success: true, data: { sale: {...}, order_id: ... } }
+      const orderId = response.data?.order_id || response.data?.sale?.sale_id || response.order_id || response.orderId;
+      
+      if (orderId) {
+        navigate(`/customer/orders/${orderId}`);
+      } else {
+        // Fallback: navigate to order history if order_id is not available
+        navigate('/customer/orders');
+      }
     } catch (err) {
       showError(err.response?.data?.message || 'Failed to process checkout. Please try again.');
     } finally {
